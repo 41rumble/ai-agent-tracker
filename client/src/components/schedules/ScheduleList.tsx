@@ -76,7 +76,16 @@ const ScheduleList: React.FC<ScheduleListProps> = ({ projectId }) => {
 
   const handleToggleActive = async (scheduleId: string, currentActive: boolean) => {
     try {
+      console.log('Toggling schedule active state:', { scheduleId, currentActive });
+      
+      if (!scheduleId) {
+        console.error('Schedule ID is undefined or empty');
+        setError('Cannot update schedule: Invalid schedule ID');
+        return;
+      }
+      
       await apiService.updateSchedule(scheduleId, { active: !currentActive });
+      
       setSchedules(schedules.map(schedule => 
         schedule._id === scheduleId 
           ? { ...schedule, active: !currentActive } 
@@ -85,6 +94,7 @@ const ScheduleList: React.FC<ScheduleListProps> = ({ projectId }) => {
     } catch (err: any) {
       setError('Failed to update schedule. Please try again.');
       console.error('Error updating schedule:', err);
+      console.error('Error details:', err.response?.data || err.message);
     }
   };
 

@@ -61,25 +61,51 @@ const scheduleController = {
   
   updateSchedule: async (req, res) => {
     try {
-      const { frequency, active, parameters } = req.body;
+      console.log('Update schedule request received:', { 
+        params: req.params,
+        body: req.body,
+        user: req.user?.id
+      });
       
-      const schedule = await Schedule.findById(req.params.id);
+      const { frequency, active, parameters } = req.body;
+      const scheduleId = req.params.id;
+      
+      if (!scheduleId || scheduleId === 'undefined') {
+        console.error('Invalid schedule ID provided:', scheduleId);
+        return res.status(400).json({ message: 'Invalid schedule ID' });
+      }
+      
+      console.log(`Looking for schedule with ID: ${scheduleId}`);
+      const schedule = await Schedule.findById(scheduleId);
       
       if (!schedule) {
+        console.error(`Schedule not found with ID: ${scheduleId}`);
         return res.status(404).json({ message: 'Schedule not found' });
       }
       
+      console.log(`Schedule found: ${schedule._id}, checking project access`);
+      
       // Check if user has access to the project this schedule belongs to
       const project = await Project.findById(schedule.projectId);
-      if (!project || project.userId.toString() !== req.user.id) {
+      if (!project) {
+        console.error(`Project not found for schedule: ${schedule._id}, projectId: ${schedule.projectId}`);
+        return res.status(404).json({ message: 'Project not found' });
+      }
+      
+      if (project.userId.toString() !== req.user.id) {
+        console.error(`User ${req.user.id} not authorized for project ${project._id}`);
         return res.status(403).json({ message: 'Not authorized' });
       }
       
+      console.log(`Updating schedule ${scheduleId} with:`, { frequency, active, parameters });
+      
       // Update schedule
       const updatedSchedule = await schedulerService.updateSchedule(
-        req.params.id,
+        scheduleId,
         { frequency, active, parameters }
       );
+      
+      console.log(`Schedule ${scheduleId} updated successfully`);
       
       res.json({
         message: 'Schedule updated successfully',
@@ -87,7 +113,11 @@ const scheduleController = {
       });
     } catch (error) {
       console.error('Update schedule error:', error);
-      res.status(500).json({ message: 'Server error' });
+      console.error('Error stack:', error.stack);
+      res.status(500).json({ 
+        message: 'Server error', 
+        error: error.message 
+      });
     }
   },
   
