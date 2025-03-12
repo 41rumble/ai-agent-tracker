@@ -515,40 +515,22 @@ const assistantsService = {
       // Parse the structured results
       const parsedResults = JSON.parse(completion.choices[0].message.content);
       
-      // Validate and process each result
+      // Process each result without URL validation to speed up processing
       for (const result of parsedResults.results || []) {
         try {
           // Check if source is a URL
           const isUrl = result.source && result.source.match(/^https?:\/\//i);
           
-          if (isUrl) {
-            // Validate the URL
-            const urlValidation = await validateUrl(result.source);
-            if (urlValidation.isValid) {
-              results.push({
-                title: result.title,
-                description: result.description,
-                source: result.source,
-                relevanceScore: result.relevanceScore || 5,
-                categories: result.categories || [],
-                type: result.type || 'Other',
-                date: result.date || new Date().toISOString().split('T')[0]
-              });
-            } else {
-              console.log(`Skipping invalid URL ${result.source}: ${urlValidation.reason}`);
-            }
-          } else {
-            // Add result even without a valid URL
-            results.push({
-              title: result.title,
-              description: result.description,
-              source: result.source || "AI-generated content",
-              relevanceScore: result.relevanceScore || 5,
-              categories: result.categories || [],
-              type: result.type || 'Other',
-              date: result.date || new Date().toISOString().split('T')[0]
-            });
-          }
+          // Add all results regardless of URL validity
+          results.push({
+            title: result.title,
+            description: result.description,
+            source: isUrl ? result.source : (result.source || "AI-generated content"),
+            relevanceScore: result.relevanceScore || 5,
+            categories: result.categories || [],
+            type: result.type || 'Other',
+            date: result.date || new Date().toISOString().split('T')[0]
+          });
         } catch (error) {
           console.error(`Error processing result:`, error);
           // Skip this result

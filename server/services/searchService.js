@@ -113,21 +113,16 @@ const searchService = {
           const citedContent = content.substring(startIndex, endIndex);
           
           try {
-            // Validate the URL
-            const urlValidation = await validateUrl(url);
-            if (urlValidation.isValid) {
-              // Generate a current date
-              const now = new Date();
-              
-              results.push({
-                title: title || 'No title',
-                description: citedContent || 'No description available',
-                source: url,
-                date: now.toISOString().split('T')[0] // Format as YYYY-MM-DD
-              });
-            } else {
-              console.log(`Skipping invalid URL ${url}: ${urlValidation.reason}`);
-            }
+            // Skip URL validation to speed up processing
+            // Generate a current date
+            const now = new Date();
+            
+            results.push({
+              title: title || 'No title',
+              description: citedContent || 'No description available',
+              source: url,
+              date: now.toISOString().split('T')[0] // Format as YYYY-MM-DD
+            });
           } catch (error) {
             console.error(`Error processing citation ${url}:`, error);
             // Skip this citation
@@ -535,16 +530,8 @@ const searchService = {
   
   storeDiscovery: async (projectId, result) => {
     try {
-      // Validate the URL before proceeding
-      console.log(`Validating URL: ${result.source}`);
-      const urlValidation = await validateUrl(result.source);
-      
-      if (!urlValidation.isValid) {
-        console.log(`Skipping invalid URL ${result.source}: ${urlValidation.reason}`);
-        return null;
-      }
-      
-      console.log(`URL validation successful for: ${result.source}`);
+      // Skip URL validation to speed up processing
+      console.log(`Processing discovery: ${result.title} (${result.source})`);
       
       // Check if this discovery already exists
       const existingDiscovery = await Discovery.findOne({
