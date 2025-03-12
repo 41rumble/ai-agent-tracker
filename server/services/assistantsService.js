@@ -266,26 +266,73 @@ const assistantsService = {
                 console.log(`Assistant requested search for: "${args.query}"`);
                 console.log(`Cleaned search query: "${query}"`);
                 
-                // Perform a web search using the OpenAI chat completions API
-                const completion = await openai.chat.completions.create({
-                  model: "gpt-4o",
-                  messages: [
-                    {
-                      role: "system",
-                      content: "You are a helpful assistant that provides search results. Return 5-7 relevant results with titles, descriptions, and URLs."
+                // Perform a web search using the OpenAI chat completions API with web search capability
+                let searchResults;
+                
+                try {
+                  // First try with the web search model
+                  console.log(`Attempting web search with model gpt-4o-search-preview for: ${query}`);
+                  const completion = await openai.chat.completions.create({
+                    model: "gpt-4o-search-preview",
+                    web_search_options: {
+                      search_context_size: "medium"
                     },
-                    {
-                      role: "user",
-                      content: `Search the web for: ${query}`
-                    }
-                  ]
-                });
+                    messages: [
+                      {
+                        role: "system",
+                        content: "You are a helpful assistant that searches the web for information. Provide comprehensive and accurate information from reputable sources."
+                      },
+                      {
+                        role: "user",
+                        content: `Search for information about: ${query}
+                        
+                        Please provide:
+                        1. A summary of the most relevant information
+                        2. Links to the sources you used
+                        3. Brief explanations of why each source is relevant`
+                      }
+                    ]
+                  });
+                  
+                  console.log(`Web search successful with ${completion.choices[0].message.annotations?.length || 0} citations`);
+                  searchResults = completion.choices[0].message.content;
+                } catch (searchError) {
+                  console.log(`Web search model failed, falling back to standard model: ${searchError.message}`);
+                  
+                  // Fall back to standard model if web search model fails
+                  try {
+                    const fallbackCompletion = await openai.chat.completions.create({
+                      model: "gpt-4o",
+                      messages: [
+                        {
+                          role: "system",
+                          content: "You are a helpful assistant that provides information about topics. Provide comprehensive and accurate information based on your knowledge."
+                        },
+                        {
+                          role: "user",
+                          content: `Provide information about: ${query}
+                          
+                          Please include:
+                          1. A summary of key concepts and technologies
+                          2. Examples of tools or techniques in this area
+                          3. How this relates to visual effects and animation workflows`
+                        }
+                      ]
+                    });
+                    
+                    console.log(`Fallback to standard model successful`);
+                    searchResults = fallbackCompletion.choices[0].message.content;
+                  } catch (fallbackError) {
+                    console.error(`Fallback model also failed: ${fallbackError.message}`);
+                    searchResults = `Error performing search for "${query}". Please try a different query.`;
+                  }
+                }
                 
                 // Add the tool output
                 toolOutputs.push({
                   tool_call_id: toolCall.id,
                   output: JSON.stringify({
-                    results: completion.choices[0].message.content
+                    results: searchResults
                   })
                 });
               } catch (error) {
@@ -471,25 +518,55 @@ const assistantsService = {
       // Validate and process each result
       for (const result of parsedResults.results || []) {
         try {
-          // Validate the URL
-          const urlValidation = await validateUrl(result.source);
-          if (urlValidation.isValid) {
+          // Check if source is a URL
+          const isUrl = result.source && result.source.match(/^https?:\/\//i);
+          
+          if (isUrl) {
+            // Validate the URL
+            const urlValidation = await validateUrl(result.source);
+            if (urlValidation.isValid) {
+              results.push({
+                title: result.title,
+                description: result.description,
+                source: result.source,
+                relevanceScore: result.relevanceScore || 5,
+                categories: result.categories || [],
+                type: result.type || 'Other',
+                date: result.date || new Date().toISOString().split('T')[0]
+              });
+            } else {
+              console.log(`Skipping invalid URL ${result.source}: ${urlValidation.reason}`);
+            }
+          } else {
+            // Add result even without a valid URL
             results.push({
               title: result.title,
               description: result.description,
-              source: result.source,
+              source: result.source || "AI-generated content",
               relevanceScore: result.relevanceScore || 5,
               categories: result.categories || [],
               type: result.type || 'Other',
               date: result.date || new Date().toISOString().split('T')[0]
             });
-          } else {
-            console.log(`Skipping invalid URL ${result.source}: ${urlValidation.reason}`);
           }
         } catch (error) {
           console.error(`Error processing result:`, error);
           // Skip this result
         }
+      }
+      
+      // If no results were found, create a single result with the content
+      if (results.length === 0) {
+        console.log("No structured results found, using content as a single result");
+        results.push({
+          title: `Information about ${query}`,
+          description: content.substring(0, 500) + (content.length > 500 ? '...' : ''),
+          source: "AI-generated content",
+          relevanceScore: 5,
+          categories: ["Information"],
+          type: "Other",
+          date: new Date().toISOString().split('T')[0]
+        });
       }
       
       return results;
