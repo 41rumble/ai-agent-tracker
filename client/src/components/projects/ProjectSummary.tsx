@@ -181,14 +181,49 @@ Check back later to see the results, or refresh this page.`);
                     ul: ({node, ...props}) => <Box component="ul" sx={{ pl: 2, mb: 2 }} {...props} />,
                     ol: ({node, ...props}) => <Box component="ol" sx={{ pl: 2, mb: 2 }} {...props} />,
                     li: ({node, ...props}) => <Box component="li" sx={{ mb: 0.5 }} {...props} />,
-                    a: ({node, ...props}) => <Button component="a" variant="text" size="small" {...props} />,
+                    a: ({node, ...props}) => {
+                      // Extract href from props
+                      const { href, ...otherProps } = props;
+                      return (
+                        <Typography 
+                          component="a" 
+                          href={href} 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          sx={{ color: 'primary.main', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
+                          {...otherProps} 
+                        />
+                      );
+                    },
                     blockquote: ({node, ...props}) => (
                       <Box component="blockquote" sx={{ borderLeft: '4px solid #ddd', pl: 2, py: 1, my: 2, fontStyle: 'italic' }} {...props} />
                     ),
-                    code: ({node, inline, ...props}) => 
-                      inline ? 
-                        <Box component="code" sx={{ fontFamily: 'monospace', backgroundColor: 'rgba(0, 0, 0, 0.05)', p: 0.5, borderRadius: 1 }} {...props} /> :
-                        <Box component="pre" sx={{ fontFamily: 'monospace', backgroundColor: 'rgba(0, 0, 0, 0.05)', p: 1.5, borderRadius: 1, overflowX: 'auto' }} {...props} />
+                    code: ({node, inline, ...props}) => {
+                      return inline ? 
+                        <Typography 
+                          component="code" 
+                          sx={{ 
+                            fontFamily: 'monospace', 
+                            backgroundColor: 'rgba(0, 0, 0, 0.05)', 
+                            px: 0.5, 
+                            py: 0.25, 
+                            borderRadius: 0.5 
+                          }} 
+                          {...props} 
+                        /> :
+                        <Box 
+                          component="pre" 
+                          sx={{ 
+                            fontFamily: 'monospace', 
+                            backgroundColor: 'rgba(0, 0, 0, 0.05)', 
+                            p: 1.5, 
+                            borderRadius: 1, 
+                            overflowX: 'auto',
+                            maxWidth: '100%'
+                          }} 
+                          {...props} 
+                        />;
+                    }
                   }}>
                     {summary}
                   </ReactMarkdown>
