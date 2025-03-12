@@ -214,18 +214,49 @@ async function checkEmailsForUser(userId) {
                     
                     // Extract links from HTML content
                     try {
-                      // Simple regex to extract URLs from href attributes
-                      const linkRegex = /href=["'](https?:\/\/[^"']+)["']/g;
+                      // More comprehensive regex to extract URLs from href attributes
+                      // This handles both quoted and unquoted href values
+                      const linkRegex = /href=["']?(https?:\/\/[^"'\s>]+)["']?/g;
                       let match;
                       while ((match = linkRegex.exec(parsed.html)) !== null) {
-                        extractedLinks.push(match[1]);
+                        // Clean up the URL (remove tracking parameters if present)
+                        let url = match[1];
+                        
+                        // Remove common tracking parameters
+                        try {
+                          const urlObj = new URL(url);
+                          ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content'].forEach(param => {
+                            urlObj.searchParams.delete(param);
+                          });
+                          url = urlObj.toString();
+                        } catch (e) {
+                          // If URL parsing fails, use the original URL
+                          console.log(`Failed to parse URL: ${url}`);
+                        }
+                        
+                        if (!extractedLinks.includes(url)) {
+                          extractedLinks.push(url);
+                        }
+                      }
+                      
+                      // Also look for URLs in text content that might not be in href attributes
+                      const urlRegex = /(https?:\/\/[^\s"'<>()[\]{}]+)/g;
+                      while ((match = urlRegex.exec(parsed.html)) !== null) {
+                        const url = match[1];
+                        if (!extractedLinks.includes(url)) {
+                          extractedLinks.push(url);
+                        }
                       }
                       
                       console.log(`Extracted ${extractedLinks.length} links from HTML content`);
                       
                       // Add extracted links to the content for better processing
+                      // Format as a structured section for better OpenAI processing
                       if (extractedLinks.length > 0) {
-                        content += "\n\nEXTRACTED LINKS:\n" + extractedLinks.join("\n");
+                        content += "\n\n### EXTRACTED LINKS ###\n";
+                        extractedLinks.forEach((link, index) => {
+                          content += `[Link ${index + 1}] ${link}\n`;
+                        });
                       }
                     } catch (err) {
                       console.error('Error extracting links from HTML:', err);
@@ -256,8 +287,30 @@ async function checkEmailsForUser(userId) {
                         const sections = extractAlphaSignalSections(content);
                         if (sections && Object.keys(sections).length > 0) {
                           console.log(`Successfully extracted ${Object.keys(sections).length} sections from Alpha Signal newsletter`);
-                          // Add section information to the content
-                          content += "\n\nEXTRACTED SECTIONS:\n" + JSON.stringify(sections, null, 2);
+                          
+                          // Format extracted items in a more structured way for better OpenAI processing
+                          if (sections.extractedItems && sections.extractedItems.length > 0) {
+                            console.log(`Found ${sections.extractedItems.length} direct items from Alpha Signal newsletter`);
+                            
+                            content += "\n\n### ALPHA SIGNAL CONTENT ITEMS ###\n";
+                            sections.extractedItems.forEach((item, index) => {
+                              content += `[Item ${index + 1}] ${item.title}\n`;
+                              content += `URL: ${item.url}\n`;
+                              if (item.category) content += `Category: ${item.category}\n`;
+                              if (item.likes) content += `Popularity: ${item.likes} Likes\n`;
+                              content += "\n";
+                            });
+                            
+                            // Also add these URLs to the extracted links if they're not already there
+                            sections.extractedItems.forEach(item => {
+                              if (item.url && !extractedLinks.includes(item.url)) {
+                                extractedLinks.push(item.url);
+                              }
+                            });
+                          }
+                          
+                          // Add other section information to the content
+                          content += "\n\n### EXTRACTED SECTIONS ###\n" + JSON.stringify(sections, null, 2);
                         }
                       } catch (err) {
                         console.error('Error extracting sections from Alpha Signal newsletter:', err);
@@ -410,6 +463,7 @@ async function runImmediateCheck(userId) {
  */
 function extractAlphaSignalSections(content) {
   const sections = {};
+  const items = [];
   
   try {
     // Extract TOP NEWS section
@@ -436,37 +490,112 @@ function extractAlphaSignalSections(content) {
       sections.howTo = howToMatch[1].trim();
     }
     
-    // Try to extract individual items from each section
-    Object.keys(sections).forEach(sectionKey => {
-      const sectionContent = sections[sectionKey];
-      const items = [];
+    // Extract news items directly from HTML structure
+    // Look for href links with titles - these are the main content items
+    const titleLinkRegex = /<a href=3D["']?(https?:\/\/[^"'\s>]+)["']?[^>]*>([^<]+)<\/a>/g;
+    let match;
+    
+    while ((match = titleLinkRegex.exec(content)) !== null) {
+      // Fix URL encoding - handle both =3D and other encoded characters
+      let url = match[1].replace(/=3D/g, '=');
       
-      // Look for patterns like titles followed by descriptions
-      const itemMatches = sectionContent.match(/([A-Z][^\n]+)\n([^⇧]+)⇧/g);
+      // Handle other common URL encoding in emails
+      url = url.replace(/=([0-9A-F]{2})/g, (_, p1) => {
+        try {
+          return String.fromCharCode(parseInt(p1, 16));
+        } catch (e) {
+          return _;
+        }
+      });
       
-      if (itemMatches) {
-        itemMatches.forEach(item => {
-          const titleMatch = item.match(/([A-Z][^\n]+)\n/);
-          const title = titleMatch ? titleMatch[1].trim() : '';
-          
-          const descMatch = item.match(/\n([^⇧]+)⇧/);
-          const description = descMatch ? descMatch[1].trim() : '';
-          
-          if (title && description) {
-            items.push({ title, description });
-          }
+      // Clean the URL - remove tracking parameters
+      try {
+        const urlObj = new URL(url);
+        ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content'].forEach(param => {
+          urlObj.searchParams.delete(param);
+        });
+        url = urlObj.toString();
+      } catch (e) {
+        console.log(`Failed to parse URL: ${url}`);
+      }
+      
+      const title = match[2].trim();
+      
+      // Look for category tags (like "AI Tool", "Chatbot", etc.)
+      const beforeContext = content.substring(Math.max(0, match.index - 300), match.index);
+      const categoryMatch = beforeContext.match(/<span style=3D[^>]*>([^<]+)<\/span>/);
+      const category = categoryMatch ? categoryMatch[1].replace(/=3D/g, '=').trim() : '';
+      
+      // Look for like counts
+      const afterContext = content.substring(match.index, Math.min(content.length, match.index + 500));
+      const likesMatch = afterContext.match(/=E2=87=A7\s*([\d,]+)\s*Likes/);
+      const likes = likesMatch ? likesMatch[1].trim() : '';
+      
+      if (title && url) {
+        items.push({
+          title,
+          url, // URL is already cleaned above
+          category,
+          likes
         });
       }
+    }
+    
+    // Add the extracted items to the sections object
+    if (items.length > 0) {
+      sections.extractedItems = items;
+    }
+    
+    // Also try the old method as a fallback
+    if (Object.keys(sections).length <= 1 && items.length === 0) {
+      console.log('Falling back to traditional section extraction method');
       
-      if (items.length > 0) {
-        sections[sectionKey + 'Items'] = items;
-      }
-    });
+      // Try to extract individual items from each section
+      Object.keys(sections).forEach(sectionKey => {
+        const sectionContent = sections[sectionKey];
+        const sectionItems = [];
+        
+        // Look for patterns like titles followed by descriptions
+        // Updated pattern to better match Alpha Signal format
+        const itemMatches = sectionContent.match(/([A-Z][^\n]+)\n([^⇧]+)⇧/g) || 
+                           sectionContent.match(/([A-Z][^\n]+)\n([^=]+)=/g) ||
+                           sectionContent.match(/<h3[^>]*>([^<]+)<\/h3>.*?<p[^>]*>([^<]+)<\/p>/g);
+        
+        if (itemMatches) {
+          itemMatches.forEach(item => {
+            let title = '';
+            let description = '';
+            
+            if (item.includes('<h3')) {
+              const titleMatch = item.match(/<h3[^>]*>([^<]+)<\/h3>/);
+              title = titleMatch ? titleMatch[1].trim() : '';
+              
+              const descMatch = item.match(/<p[^>]*>([^<]+)<\/p>/);
+              description = descMatch ? descMatch[1].trim() : '';
+            } else {
+              const titleMatch = item.match(/([A-Z][^\n]+)\n/);
+              title = titleMatch ? titleMatch[1].trim() : '';
+              
+              const descMatch = item.match(/\n([^⇧=]+)[⇧=]/);
+              description = descMatch ? descMatch[1].trim() : '';
+            }
+            
+            if (title && description) {
+              sectionItems.push({ title, description });
+            }
+          });
+        }
+        
+        if (sectionItems.length > 0) {
+          sections[sectionKey + 'Items'] = sectionItems;
+        }
+      });
+    }
     
     return sections;
   } catch (error) {
     console.error('Error extracting Alpha Signal sections:', error);
-    return {};
+    return { extractedItems: items }; // Return any items we found even if there was an error
   }
 }
 

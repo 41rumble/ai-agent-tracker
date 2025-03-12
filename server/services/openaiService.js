@@ -260,7 +260,18 @@ const openaiService = {
         
         The newsletter has a structured format with multiple sections. Each section contains multiple items with titles, descriptions, and often links. Extract ALL of these as separate discoveries.
         
-        Be sure to extract any URLs that point to original research papers, articles, or tools. If URLs aren't explicitly visible, infer them from the context (e.g., product names, company mentions).
+        IMPORTANT: Look for the "### ALPHA SIGNAL CONTENT ITEMS ###" and "### EXTRACTED LINKS ###" sections in the content. These contain pre-extracted items and links from the newsletter that you should prioritize. Each item in the ALPHA SIGNAL CONTENT ITEMS section includes a title, URL, category, and popularity information.
+        
+        For each item in the "ALPHA SIGNAL CONTENT ITEMS" section:
+        1. Create a separate discovery entry
+        2. Use the provided URL as the source
+        3. Use the title as provided
+        4. Generate a detailed description based on the title and category
+        5. Assign a relevance score based on how well it matches the project goals and interests
+        
+        If there are additional items in the newsletter content that weren't pre-extracted, create discoveries for those as well.
+        
+        Be sure to extract any URLs that point to original research papers, articles, or tools. If URLs aren't explicitly visible, check the "### EXTRACTED LINKS ###" section for relevant links.
         
         For each item in the newsletter, create a separate discovery with a high level of detail.`;
       }
@@ -319,7 +330,9 @@ const openaiService = {
             - For tools, include information about availability, pricing, or access if mentioned
             - For AI models and APIs (like OpenAI's Responses API, Atla AI's Selene, etc.), extract detailed capabilities
             - Pay special attention to AI development tools, frameworks, and SDKs
-            - Check the EXTRACTED LINKS section at the end of the content for additional URLs to include
+            - Check the "### EXTRACTED LINKS ###" section for URLs to include
+            - For Alpha Signal newsletters, prioritize items in the "### ALPHA SIGNAL CONTENT ITEMS ###" section
+            - For each item in the ALPHA SIGNAL CONTENT ITEMS section, create a separate discovery using the provided URL, title, and category
             
             Format your response as a JSON object with an array of discoveries. Only include information that is actually relevant to the project.
             
