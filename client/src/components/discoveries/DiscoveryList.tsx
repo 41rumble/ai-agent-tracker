@@ -303,7 +303,7 @@ const DiscoveryList: React.FC<DiscoveryListProps> = ({ projectId }) => {
                                 </Button>
                                 <Button 
                                   size="small" 
-                                  onClick={() => handleOpenFeedbackDialog(discovery)}
+                                  onClick={() => handleFeedbackClick(discovery)}
                                 >
                                   Provide Feedback
                                 </Button>
