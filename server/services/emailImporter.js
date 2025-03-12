@@ -6,7 +6,7 @@ const Project = require('../models/Project');
 const Discovery = require('../models/Discovery');
 const User = require('../models/User');
 const openaiService = require('./openaiService');
-const config = require('../config');
+const apiConfig = require('../config/apiConfig');
 
 // Newsletter sources to monitor - can be expanded later via UI
 const NEWSLETTER_SOURCES = [
