@@ -272,6 +272,8 @@ const searchService = {
                 
                 Be precise in your classification. Don't default to Article unless it truly is an article.
                 
+                CRITICAL: Return ONLY raw JSON without any markdown formatting, code blocks, or additional text.
+                
                 Format your response as JSON: {
                   "relevanceScore": number, 
                   "categories": ["category1", "category2"],
@@ -282,7 +284,23 @@ const searchService = {
             ]
           });
           
-          const content = completion.choices[0].message.content;
+          let content = completion.choices[0].message.content;
+          
+          // Clean up the content if it contains markdown code blocks
+          if (content.includes('```')) {
+            // Extract JSON from markdown code blocks if present
+            const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
+            if (jsonMatch && jsonMatch[1]) {
+              content = jsonMatch[1].trim();
+            } else {
+              // Remove any markdown formatting
+              content = content.replace(/```json|```/g, '').trim();
+            }
+          }
+          
+          console.log('Cleaned content for parsing:', content);
+          
+          // Parse the JSON content
           const evaluation = JSON.parse(content);
           
           processedResults.push({
@@ -293,12 +311,53 @@ const searchService = {
           });
         } catch (evaluationError) {
           console.error('Result evaluation error:', evaluationError);
-          // Add with default values if evaluation fails
+          console.error('Failed content:', completion?.choices[0]?.message?.content || 'No content available');
+          
+          // Try to extract any useful information from the error response
+          let type = 'Other';
+          let categories = [];
+          let relevanceScore = 5;
+          
+          try {
+            // If the error is due to partial JSON, try to extract what we can
+            const content = completion?.choices[0]?.message?.content || '';
+            
+            // Try to determine the type from the content
+            if (content.includes('"type"')) {
+              const typeMatch = content.match(/"type"\s*:\s*"([^"]+)"/);
+              if (typeMatch && typeMatch[1]) {
+                type = typeMatch[1];
+              }
+            }
+            
+            // Try to determine relevance score from the content
+            if (content.includes('"relevanceScore"')) {
+              const scoreMatch = content.match(/"relevanceScore"\s*:\s*(\d+)/);
+              if (scoreMatch && scoreMatch[1]) {
+                relevanceScore = parseInt(scoreMatch[1], 10);
+              }
+            }
+            
+            // Try to extract categories if possible
+            if (content.includes('"categories"')) {
+              const categoriesMatch = content.match(/"categories"\s*:\s*\[(.*?)\]/);
+              if (categoriesMatch && categoriesMatch[1]) {
+                categories = categoriesMatch[1]
+                  .split(',')
+                  .map(cat => cat.trim().replace(/"/g, ''))
+                  .filter(cat => cat.length > 0);
+              }
+            }
+          } catch (extractionError) {
+            console.error('Error extracting partial data:', extractionError);
+          }
+          
+          // Add with extracted or default values
           processedResults.push({
             ...result,
-            relevanceScore: 5,
-            categories: [],
-            type: 'Other'
+            relevanceScore,
+            categories,
+            type
           });
         }
       }
