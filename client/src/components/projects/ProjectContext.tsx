@@ -83,7 +83,8 @@ const ProjectContext: React.FC<ProjectContextProps> = ({ projectId }) => {
     try {
       setSubmitting(true);
       
-      if (currentQuestion) {
+      if (currentQuestion && currentQuestion.questionId) {
+        console.log(`Submitting response to question ID: ${currentQuestion.questionId}`);
         // Submit as a response to the current question
         const response = await apiService.addUserResponse(
           projectId, 
@@ -96,8 +97,11 @@ const ProjectContext: React.FC<ProjectContextProps> = ({ projectId }) => {
         // Update current question
         if (response.data.followUpQuestion) {
           setCurrentQuestion(response.data.followUpQuestion);
+        } else {
+          setCurrentQuestion(null);
         }
       } else {
+        console.log('Submitting as general update');
         // Submit as a general update
         const response = await apiService.addUserUpdate(projectId, userInput);
         setContext(response.data.context);
@@ -105,6 +109,8 @@ const ProjectContext: React.FC<ProjectContextProps> = ({ projectId }) => {
         // Set new question if available
         if (response.data.followUpQuestion) {
           setCurrentQuestion(response.data.followUpQuestion);
+        } else {
+          setCurrentQuestion(null);
         }
       }
       
@@ -113,6 +119,7 @@ const ProjectContext: React.FC<ProjectContextProps> = ({ projectId }) => {
     } catch (err: any) {
       setError('Failed to submit update. Please try again.');
       console.error('Error submitting update:', err);
+      console.error('Error details:', err.response?.data || err.message);
     } finally {
       setSubmitting(false);
     }

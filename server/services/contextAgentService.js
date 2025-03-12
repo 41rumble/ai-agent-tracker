@@ -78,13 +78,36 @@ const contextAgentService = {
     try {
       const context = await contextAgentService.getProjectContext(projectId);
       
-      // Find the question in context entries
-      const questionEntry = context.contextEntries.find(entry => 
-        entry.type === 'agent_question' && entry._id.toString() === questionId
-      );
+      console.log(`Adding user response for project ${projectId}, questionId: ${questionId}`);
+      console.log(`Context entries: ${context.contextEntries.length}`);
       
-      if (!questionEntry) {
-        throw new Error('Question not found in context');
+      // Find the question in context entries
+      let questionEntry = null;
+      let questionContent = '';
+      
+      // Try to find the question by ID
+      if (questionId) {
+        questionEntry = context.contextEntries.find(entry => 
+          entry.type === 'agent_question' && entry._id.toString() === questionId
+        );
+        
+        if (questionEntry) {
+          questionContent = questionEntry.content;
+          console.log(`Found question by ID: ${questionContent}`);
+        } else {
+          console.log(`Question with ID ${questionId} not found, looking for most recent question`);
+          
+          // If not found by ID, get the most recent question
+          const questions = context.contextEntries.filter(entry => entry.type === 'agent_question');
+          if (questions.length > 0) {
+            questionEntry = questions[questions.length - 1];
+            questionContent = questionEntry.content;
+            questionId = questionEntry._id.toString();
+            console.log(`Using most recent question instead: ${questionContent}`);
+          } else {
+            console.log('No questions found in context, treating as general update');
+          }
+        }
       }
       
       // Add the response
@@ -93,11 +116,13 @@ const contextAgentService = {
         content: response,
         metadata: {
           ...metadata,
-          questionId,
-          questionContent: questionEntry.content
+          questionId: questionId || 'general',
+          questionContent: questionContent || 'General response'
         },
         timestamp: new Date()
       });
+      
+      console.log(`Added user response: ${response}`);
       
       // Update project phase and progress based on response
       const updatedContext = await contextAgentService.updateProjectProgress(context, response);
@@ -108,6 +133,7 @@ const contextAgentService = {
       return { context: updatedContext, followUpQuestion };
     } catch (error) {
       console.error('Error adding user response:', error);
+      console.error('Error stack:', error.stack);
       throw new Error('Failed to add user response');
     }
   },
@@ -210,11 +236,14 @@ const contextAgentService = {
    */
   generateFollowUpQuestion: async (context) => {
     try {
+      console.log(`Generating follow-up question for project ${context.projectId}`);
+      
       // Get recent discoveries for this project
       const recentDiscoveries = await Discovery.find({ 
-        projectId: context.projectId,
-        presented: true
+        projectId: context.projectId
       }).sort({ discoveredAt: -1 }).limit(5);
+      
+      console.log(`Found ${recentDiscoveries.length} recent discoveries`);
       
       // Use OpenAI to generate a relevant follow-up question
       const completion = await openai.chat.completions.create({
@@ -245,6 +274,7 @@ const contextAgentService = {
       });
       
       const question = completion.choices[0].message.content;
+      console.log(`Generated question: ${question}`);
       
       // Add the question to context
       context.contextEntries.push({
@@ -255,16 +285,47 @@ const contextAgentService = {
       
       await context.save();
       
+      // Get the ID of the newly added question
+      const newQuestionId = context.contextEntries[context.contextEntries.length - 1]._id;
+      console.log(`Added question to context with ID: ${newQuestionId}`);
+      
       return {
-        questionId: context.contextEntries[context.contextEntries.length - 1]._id,
+        questionId: newQuestionId.toString(),
         question
       };
     } catch (error) {
       console.error('Error generating follow-up question:', error);
-      return {
-        questionId: null,
-        question: 'What is your current progress on this project?'
-      };
+      console.error('Error stack:', error.stack);
+      
+      // Create a default question
+      try {
+        const defaultQuestion = 'What is your current progress on this project?';
+        console.log(`Using default question: ${defaultQuestion}`);
+        
+        // Add the default question to context
+        context.contextEntries.push({
+          type: 'agent_question',
+          content: defaultQuestion,
+          timestamp: new Date()
+        });
+        
+        await context.save();
+        
+        // Get the ID of the newly added question
+        const newQuestionId = context.contextEntries[context.contextEntries.length - 1]._id;
+        console.log(`Added default question to context with ID: ${newQuestionId}`);
+        
+        return {
+          questionId: newQuestionId.toString(),
+          question: defaultQuestion
+        };
+      } catch (saveError) {
+        console.error('Error saving default question:', saveError);
+        return {
+          questionId: null,
+          question: 'What is your current progress on this project?'
+        };
+      }
     }
   },
   
