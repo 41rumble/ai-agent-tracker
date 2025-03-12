@@ -8,27 +8,11 @@ const User = require('../models/User');
 const openaiService = require('./openaiService');
 const apiConfig = require('../config/apiConfig');
 
-// Newsletter sources to monitor - can be expanded later via UI
-const NEWSLETTER_SOURCES = [
+// Default newsletter sources if none are specified by the user
+const DEFAULT_NEWSLETTER_SOURCES = [
   // Primary sources specified by the user
   'news@alphasignal.ai',
-  'superhuman@mail.joinsuperhuman.ai',
-  
-  // Additional industry sources
-  'newsletter@siggraph.org',
-  'news@fxguide.com',
-  'newsletter@awn.com',
-  'digest@beforesandafters.com',
-  'newsletter@cgchannel.com',
-  'newsletter@cgw.com',
-  'newsletter@3dartistonline.com',
-  'newsletter@blender.org',
-  'newsletter@maxon.net',
-  'newsletter@autodesk.com',
-  'newsletter@nvidia.com',
-  'newsletter@unrealengine.com',
-  'newsletter@unity3d.com',
-  'newsletter@vfxvoice.com'
+  'superhuman@mail.joinsuperhuman.ai'
 ];
 
 /**
@@ -113,26 +97,54 @@ async function checkEmailsForUser(userId) {
   try {
     console.log(`Checking emails for user ${userId}`);
     
+    // Get user and their email settings
+    const user = await User.findById(userId);
+    if (!user) {
+      console.log(`User ${userId} not found`);
+      return { error: 'User not found' };
+    }
+    
+    // Check if email import is enabled for this user
+    if (!user.emailImportSettings || !user.emailImportSettings.enabled) {
+      console.log(`Email import not enabled for user ${userId}`);
+      return { error: 'Email import not enabled' };
+    }
+    
     // Get user's projects
     const projects = await Project.find({ userId });
     if (!projects.length) {
       console.log(`No projects found for user ${userId}`);
-      return;
+      return { error: 'No projects found' };
     }
     
     // Use the first project for now - could be enhanced to determine relevance
     const projectId = projects[0]._id;
     
-    // Connect to email using hardcoded credentials for now
-    // In production, these should come from environment variables or user settings
-    console.log('Connecting to email server with credentials');
+    // Get email settings from user
+    const emailSettings = user.emailImportSettings;
+    
+    // Use newsletter sources from user settings, or fall back to defaults
+    const newsletterSources = emailSettings.sources && emailSettings.sources.length > 0 
+      ? emailSettings.sources 
+      : DEFAULT_NEWSLETTER_SOURCES;
+    
+    if (newsletterSources.length === 0) {
+      console.log('No newsletter sources configured');
+      return { error: 'No newsletter sources configured' };
+    }
+    
+    console.log(`Connecting to email server ${emailSettings.server}:${emailSettings.port} with username ${emailSettings.username}`);
+    
+    // Connect to email using user settings
     const imap = new Imap({
-      user: 'brett@feeney.com', // Hardcoded for testing
-      password: 'Sk1pper))', // Hardcoded for testing
-      host: 'mail.hover.com', // Hardcoded for testing
-      port: 993,
-      tls: true,
-      tlsOptions: { rejectUnauthorized: false }
+      user: emailSettings.username || process.env.EMAIL_IMPORT_USER,
+      password: emailSettings.password || process.env.EMAIL_IMPORT_PASS,
+      host: emailSettings.server || process.env.EMAIL_IMPORT_SERVER || 'mail.hover.com',
+      port: emailSettings.port || parseInt(process.env.EMAIL_IMPORT_PORT, 10) || 993,
+      tls: emailSettings.secure !== undefined ? emailSettings.secure : (process.env.EMAIL_IMPORT_SECURE === 'true'),
+      tlsOptions: { rejectUnauthorized: false },
+      connTimeout: 30000, // 30 seconds connection timeout
+      authTimeout: 30000  // 30 seconds authentication timeout
     });
     
     return new Promise((resolve, reject) => {
@@ -149,7 +161,7 @@ async function checkEmailsForUser(userId) {
           const searchCriteria = [
             'UNSEEN', // Only get unread emails
             ['OR', 
-              ...NEWSLETTER_SOURCES.map(source => ['FROM', source])
+              ...newsletterSources.map(source => ['FROM', source])
             ]
           ];
           
@@ -321,7 +333,19 @@ async function runImmediateCheck(userId) {
     }
   }
   
-  return checkEmailsForUser(userId);
+  try {
+    // Update the lastChecked timestamp
+    await User.findByIdAndUpdate(userId, {
+      $set: {
+        'emailImportSettings.lastChecked': new Date()
+      }
+    });
+    
+    return checkEmailsForUser(userId);
+  } catch (error) {
+    console.error('Error running immediate check:', error);
+    throw error;
+  }
 }
 
 module.exports = {

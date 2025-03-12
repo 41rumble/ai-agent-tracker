@@ -14,7 +14,13 @@ import { apiService } from '../../services/api';
 const EmailImportSettings: React.FC = () => {
   const [settings, setSettings] = useState({
     enabled: false,
-    sources: [] as string[]
+    sources: [] as string[],
+    server: '',
+    port: 993,
+    username: '',
+    password: '',
+    secure: true,
+    lastChecked: null as Date | null
   });
   
   const [newSource, setNewSource] = useState('');
@@ -161,6 +167,67 @@ const EmailImportSettings: React.FC = () => {
         />
         
         <Typography variant="subtitle1" sx={{ mt: 3, mb: 1 }}>
+          Email Server Settings
+        </Typography>
+        
+        <Typography variant="body2" color="text.secondary" paragraph>
+          Configure your email server settings to allow the system to check for newsletters.
+        </Typography>
+        
+        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 2, mb: 3 }}>
+          <TextField
+            label="Email Server"
+            placeholder="mail.example.com"
+            value={settings.server}
+            onChange={(e) => setSettings({...settings, server: e.target.value})}
+            disabled={!settings.enabled}
+            size="small"
+            fullWidth
+          />
+          
+          <TextField
+            label="Port"
+            type="number"
+            value={settings.port}
+            onChange={(e) => setSettings({...settings, port: parseInt(e.target.value, 10) || 993})}
+            disabled={!settings.enabled}
+            size="small"
+            fullWidth
+          />
+          
+          <TextField
+            label="Username"
+            placeholder="your.email@example.com"
+            value={settings.username}
+            onChange={(e) => setSettings({...settings, username: e.target.value})}
+            disabled={!settings.enabled}
+            size="small"
+            fullWidth
+          />
+          
+          <TextField
+            label="Password"
+            type="password"
+            value={settings.password}
+            onChange={(e) => setSettings({...settings, password: e.target.value})}
+            disabled={!settings.enabled}
+            size="small"
+            fullWidth
+          />
+          
+          <FormControlLabel
+            control={
+              <Switch
+                checked={settings.secure}
+                onChange={(e) => setSettings({...settings, secure: e.target.checked})}
+                disabled={!settings.enabled}
+              />
+            }
+            label="Use Secure Connection (TLS/SSL)"
+          />
+        </Box>
+        
+        <Typography variant="subtitle1" sx={{ mt: 4, mb: 1 }}>
           Newsletter Sources
         </Typography>
         
@@ -218,6 +285,12 @@ const EmailImportSettings: React.FC = () => {
             )}
           </List>
         </Paper>
+        
+        {settings.lastChecked && (
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Last checked: {new Date(settings.lastChecked).toLocaleString()}
+          </Typography>
+        )}
         
         <Divider sx={{ my: 3 }} />
         

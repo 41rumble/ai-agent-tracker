@@ -31,7 +31,30 @@ const UserSchema = new Schema({
     },
     sources: [{
       type: String
-    }]
+    }],
+    server: {
+      type: String,
+      default: process.env.EMAIL_IMPORT_SERVER || 'mail.hover.com'
+    },
+    port: {
+      type: Number,
+      default: parseInt(process.env.EMAIL_IMPORT_PORT, 10) || 993
+    },
+    username: {
+      type: String,
+      default: process.env.EMAIL_IMPORT_USER || ''
+    },
+    password: {
+      type: String,
+      default: process.env.EMAIL_IMPORT_PASS || ''
+    },
+    secure: {
+      type: Boolean,
+      default: process.env.EMAIL_IMPORT_SECURE === 'true'
+    },
+    lastChecked: {
+      type: Date
+    }
   }
 }, { timestamps: true });
 
