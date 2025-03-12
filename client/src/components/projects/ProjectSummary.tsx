@@ -11,11 +11,13 @@ import {
   Card,
   CardContent,
   IconButton,
-  Tooltip
+  Tooltip,
+  Badge
 } from '@mui/material';
 import {
   Refresh as RefreshIcon,
-  Info as InfoIcon
+  Info as InfoIcon,
+  Notifications as NotificationsIcon
 } from '@mui/icons-material';
 import ReactMarkdown from 'react-markdown';
 import { apiService } from '../../services/api';
@@ -30,10 +32,43 @@ const ProjectSummary: React.FC<ProjectSummaryProps> = ({ projectId }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [generating, setGenerating] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [newDiscoveriesCount, setNewDiscoveriesCount] = useState(0);
+  const [summaryAge, setSummaryAge] = useState<number>(0); // Age in hours
 
   useEffect(() => {
-    fetchSummary();
+    // Only fetch summary on initial load
+    if (loading) {
+      fetchSummary();
+    }
   }, [projectId]);
+
+  // Check for new discoveries periodically without regenerating the summary
+  useEffect(() => {
+    const checkForNewDiscoveries = async () => {
+      try {
+        // Get the latest discoveries
+        const response = await apiService.getDiscoveries(projectId);
+        const latestDiscoveries = response.data || [];
+        
+        // If we have a last updated timestamp, count discoveries newer than that
+        if (lastUpdated && latestDiscoveries.length > 0) {
+          const newCount = latestDiscoveries.filter(
+            (d: any) => new Date(d.discoveredAt) > lastUpdated
+          ).length;
+          
+          setNewDiscoveriesCount(newCount);
+        }
+      } catch (error) {
+        console.error('Error checking for new discoveries:', error);
+      }
+    };
+
+    // Check for new discoveries when the component mounts
+    if (!loading && lastUpdated) {
+      checkForNewDiscoveries();
+    }
+  }, [projectId, lastUpdated, loading]);
 
   const fetchSummary = async () => {
     try {
@@ -43,6 +78,16 @@ const ProjectSummary: React.FC<ProjectSummaryProps> = ({ projectId }) => {
       if (response.data && response.data.summary) {
         setSummary(response.data.summary);
         setDiscoveries(response.data.discoveries || []);
+        
+        // Store the current time as the last updated time
+        const now = new Date();
+        setLastUpdated(now);
+        
+        // Reset new discoveries count
+        setNewDiscoveriesCount(0);
+        
+        // Set summary age to 0 (fresh)
+        setSummaryAge(0);
       } else {
         setSummary(null);
       }
@@ -55,6 +100,9 @@ const ProjectSummary: React.FC<ProjectSummaryProps> = ({ projectId }) => {
       setLoading(false);
     }
   };
+
+  // Calculate if summary needs refresh (older than 24 hours or has new discoveries)
+  const needsRefresh = summaryAge > 24 || newDiscoveriesCount > 0;
 
   const generateSummary = async () => {
     try {
@@ -75,12 +123,25 @@ ${prev ? '\n\n### Previous summary:\n' + prev : ''}`;
         return backgroundMessage;
       });
       
+      // Wait a moment to allow the search to start processing
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      
       // Then generate a new summary
       const response = await apiService.getRecommendations(projectId);
       
       if (response.data && response.data.summary) {
         setSummary(response.data.summary);
         setDiscoveries(response.data.discoveries || []);
+        
+        // Store the current time as the last updated time
+        const now = new Date();
+        setLastUpdated(now);
+        
+        // Reset new discoveries count
+        setNewDiscoveriesCount(0);
+        
+        // Set summary age to 0 (fresh)
+        setSummaryAge(0);
       } else {
         setSummary(`
 ## 🔍 Search in progress...
@@ -105,21 +166,64 @@ Check back later to see the results, or refresh this page.`);
     );
   }
 
+  // Calculate time since last update
+  useEffect(() => {
+    if (lastUpdated) {
+      const interval = setInterval(() => {
+        const now = new Date();
+        const hoursSinceUpdate = Math.floor((now.getTime() - lastUpdated.getTime()) / (1000 * 60 * 60));
+        setSummaryAge(hoursSinceUpdate);
+      }, 60000); // Check every minute
+      
+      // Initial calculation
+      const now = new Date();
+      const hoursSinceUpdate = Math.floor((now.getTime() - lastUpdated.getTime()) / (1000 * 60 * 60));
+      setSummaryAge(hoursSinceUpdate);
+      
+      return () => clearInterval(interval);
+    }
+  }, [lastUpdated]);
+
   return (
     <Box>
       <Paper sx={{ p: 3, mb: 3 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-          <Typography variant="h5">
-            Project Summary
-          </Typography>
-          <Button
-            variant="outlined"
-            startIcon={<RefreshIcon />}
-            onClick={generateSummary}
-            disabled={generating}
-          >
-            {generating ? 'Generating...' : 'Generate New Summary'}
-          </Button>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography variant="h5">
+              Project Summary
+            </Typography>
+            {newDiscoveriesCount > 0 && (
+              <Badge badgeContent={newDiscoveriesCount} color="error" sx={{ ml: 1 }}>
+                <NotificationsIcon color="action" />
+              </Badge>
+            )}
+          </Box>
+          <Box>
+            {lastUpdated && (
+              <Typography variant="body2" color="text.secondary" sx={{ mr: 2, display: 'inline-block' }}>
+                Last updated: {lastUpdated.toLocaleString()}
+                {needsRefresh && (
+                  <Tooltip title="New discoveries available or summary is outdated">
+                    <Chip 
+                      label="Update available" 
+                      color="primary" 
+                      size="small" 
+                      sx={{ ml: 1 }} 
+                    />
+                  </Tooltip>
+                )}
+              </Typography>
+            )}
+            <Button
+              variant={needsRefresh ? "contained" : "outlined"}
+              startIcon={<RefreshIcon />}
+              onClick={generateSummary}
+              disabled={generating}
+              color={needsRefresh ? "primary" : "inherit"}
+            >
+              {generating ? 'Generating...' : needsRefresh ? 'Update Summary' : 'Generate New Summary'}
+            </Button>
+          </Box>
         </Box>
         
         {error && (

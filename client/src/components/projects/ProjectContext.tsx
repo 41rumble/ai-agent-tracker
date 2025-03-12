@@ -125,16 +125,23 @@ const ProjectContext: React.FC<ProjectContextProps> = ({ projectId }) => {
     }
   };
 
-  const handleGenerateQuestion = async () => {
+  const handleGenerateQuestion = async (force = false) => {
     try {
       setSubmitting(true);
-      const response = await apiService.generateProjectQuestion(projectId);
+      const response = await apiService.generateProjectQuestion(projectId, force);
       
       if (response.data.question) {
         setCurrentQuestion(response.data.question);
+        
+        // If this is a new question, add a visual indicator
+        if (response.data.isNew) {
+          // Briefly show a success message or highlight the new question
+          setError('');
+        } else {
+          // If using an existing question, show a message
+          setError('Using existing recent question. Force refresh for a new question.');
+        }
       }
-      
-      setError('');
     } catch (err: any) {
       setError('Failed to generate question. Please try again.');
       console.error('Error generating question:', err);
@@ -246,13 +253,23 @@ const ProjectContext: React.FC<ProjectContextProps> = ({ projectId }) => {
                     {submitting ? 'Submitting...' : 'Submit'}
                   </Button>
                   
-                  {!currentQuestion && (
+                  {!currentQuestion ? (
                     <Button
                       variant="outlined"
-                      onClick={handleGenerateQuestion}
+                      onClick={() => handleGenerateQuestion(false)}
                       disabled={submitting}
                     >
                       Get Question
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outlined"
+                      onClick={() => handleGenerateQuestion(true)}
+                      disabled={submitting}
+                      color="secondary"
+                      size="small"
+                    >
+                      New Question
                     </Button>
                   )}
                 </Box>

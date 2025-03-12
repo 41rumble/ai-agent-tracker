@@ -238,6 +238,12 @@ const contextAgentService = {
     try {
       console.log(`Generating follow-up question for project ${context.projectId}`);
       
+      // Get project details
+      const project = await Project.findById(context.projectId);
+      if (!project) {
+        throw new Error(`Project not found with ID: ${context.projectId}`);
+      }
+      
       // Get recent discoveries for this project
       const recentDiscoveries = await Discovery.find({ 
         projectId: context.projectId
@@ -245,30 +251,73 @@ const contextAgentService = {
       
       console.log(`Found ${recentDiscoveries.length} recent discoveries`);
       
+      // Get user feedback on discoveries
+      const userFeedback = await Discovery.find({
+        projectId: context.projectId,
+        'userFeedback.useful': true
+      }).limit(3);
+      
+      // Check if we've asked a question recently (within the last 24 hours)
+      const lastDayEntries = context.contextEntries.filter(entry => {
+        const entryDate = new Date(entry.timestamp);
+        const oneDayAgo = new Date();
+        oneDayAgo.setDate(oneDayAgo.getDate() - 1);
+        return entry.type === 'agent_question' && entryDate > oneDayAgo;
+      });
+      
+      // Get the most recent user response, if any
+      const recentUserResponses = context.contextEntries.filter(entry => 
+        entry.type === 'user_response'
+      ).slice(-3);
+      
       // Use OpenAI to generate a relevant follow-up question
       const completion = await openai.chat.completions.create({
         model: "gpt-4-turbo",
         messages: [
           {
             role: "system",
-            content: `You are an AI assistant that helps users track their progress on projects.
-            Your task is to generate a relevant follow-up question based on the project context and recent discoveries.
-            The question should help understand where the user is in their project journey and what they need next.`
+            content: `You are an AI assistant that helps users track their progress on projects in ${project.domain}.
+            Your task is to generate a relevant, insightful follow-up question based on the project context, recent discoveries, and user feedback.
+            The question should help understand where the user is in their project journey and what they need next.
+            
+            Guidelines for generating questions:
+            1. If the user has recently responded to questions, build on those responses
+            2. If there are new discoveries, ask about their relevance or usefulness
+            3. If the user has marked certain discoveries as useful, ask about implementation or application
+            4. If the project is in early phases, focus on planning and requirements
+            5. If the project is in middle phases, focus on progress and challenges
+            6. If the project is in late phases, focus on outcomes and next steps
+            7. Avoid asking the same question repeatedly
+            8. Make questions specific and actionable
+            9. Occasionally ask about technical challenges or implementation details
+            10. Sometimes ask about project timeline and milestones`
           },
           {
             role: "user",
             content: `Generate a follow-up question based on this project context:
             
+            Project name: ${project.name}
+            Project domain: ${project.domain}
+            Project goals: ${project.goals.join(', ')}
             Project phase: ${context.currentPhase}
             Progress: ${context.progressPercentage}%
             
-            Recent context:
+            Recent context entries:
             ${context.contextEntries.slice(-5).map(entry => `${entry.type}: ${entry.content}`).join('\n')}
+            
+            Recent user responses:
+            ${recentUserResponses.map(entry => entry.content).join('\n')}
             
             Recent discoveries:
             ${recentDiscoveries.map(d => `- ${d.title}: ${d.description.substring(0, 100)}...`).join('\n')}
             
-            The question should be specific, helpful, and focused on understanding the user's current needs or progress.`
+            Discoveries marked as useful:
+            ${userFeedback.map(d => `- ${d.title}`).join('\n')}
+            
+            Number of questions asked in the last 24 hours: ${lastDayEntries.length}
+            
+            The question should be specific, helpful, and focused on understanding the user's current needs or progress.
+            If many questions have been asked recently, make this one particularly insightful and valuable.`
           }
         ]
       });
@@ -280,6 +329,12 @@ const contextAgentService = {
       context.contextEntries.push({
         type: 'agent_question',
         content: question,
+        metadata: {
+          projectPhase: context.currentPhase,
+          progressPercentage: context.progressPercentage,
+          recentDiscoveriesCount: recentDiscoveries.length,
+          usefulDiscoveriesCount: userFeedback.length
+        },
         timestamp: new Date()
       });
       
@@ -297,10 +352,36 @@ const contextAgentService = {
       console.error('Error generating follow-up question:', error);
       console.error('Error stack:', error.stack);
       
-      // Create a default question
+      // Create a default question based on the context phase if available
       try {
-        const defaultQuestion = 'What is your current progress on this project?';
-        console.log(`Using default question: ${defaultQuestion}`);
+        let defaultQuestion = 'What is your current progress on this project?';
+        
+        if (context.currentPhase) {
+          // Tailor the default question based on the project phase
+          switch(context.currentPhase.toLowerCase()) {
+            case 'initial':
+            case 'planning':
+              defaultQuestion = 'What are your initial goals and requirements for this project?';
+              break;
+            case 'development':
+            case 'implementation':
+              defaultQuestion = 'What challenges are you facing in the current development phase?';
+              break;
+            case 'testing':
+              defaultQuestion = 'How is the testing process going, and what issues have you identified?';
+              break;
+            case 'deployment':
+            case 'launch':
+              defaultQuestion = 'What are your plans for deployment and launch?';
+              break;
+            case 'maintenance':
+            case 'completed':
+              defaultQuestion = 'What outcomes have you achieved, and what are your next steps?';
+              break;
+          }
+        }
+        
+        console.log(`Using default question based on phase '${context.currentPhase}': ${defaultQuestion}`);
         
         // Add the default question to context
         context.contextEntries.push({

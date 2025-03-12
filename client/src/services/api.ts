@@ -159,8 +159,8 @@ export const apiService = {
   addUserResponse: (projectId: string, questionId: string, response: string, metadata = {}) => 
     api.post(endpoints.contextAgent.addResponse(projectId, questionId), { response, metadata }),
   
-  generateProjectQuestion: (projectId: string) => 
-    api.get(endpoints.contextAgent.getQuestion(projectId)),
+  generateProjectQuestion: (projectId: string, force: boolean = false) => 
+    api.get(`${endpoints.contextAgent.getQuestion(projectId)}${force ? '?force=true' : ''}`),
 };
 
 export default api;
