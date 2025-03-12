@@ -6,7 +6,7 @@ const agentController = {
   triggerSearch: async (req, res) => {
     try {
       console.log('Search triggered with request body:', req.body);
-      const { projectId } = req.body;
+      const { projectId, force } = req.body;
       
       if (!projectId) {
         console.error('No projectId provided in request body');
@@ -32,6 +32,30 @@ const agentController = {
       
       console.log(`Starting search for project: ${project.name} (${projectId})`);
       
+      // Check if we've searched recently (within the last 6 hours) and force is not true
+      let recentSearchExists = false;
+      if (!force) {
+        const sixHoursAgo = new Date();
+        sixHoursAgo.setHours(sixHoursAgo.getHours() - 6);
+        
+        // Get recent discoveries for this project
+        const recentDiscoveries = await Discovery.find({
+          projectId: project._id,
+          createdAt: { $gt: sixHoursAgo }
+        }).countDocuments();
+        
+        if (recentDiscoveries > 0) {
+          recentSearchExists = true;
+        }
+      }
+      
+      // Update project state to indicate search is in progress
+      project.currentState.progress = 'In Progress';
+      project.currentState.lastUpdated = new Date();
+      await project.save();
+      
+      console.log(`Project ${projectId} state updated to In Progress`);
+      
       // Trigger search in background
       searchService.performProjectSearch(project)
         .then(results => {
@@ -49,20 +73,17 @@ const agentController = {
           console.error('Search error details:', error.stack || error);
         });
       
-      // Update project state to indicate search is in progress
-      project.currentState.progress = 'In Progress';
-      project.currentState.lastUpdated = new Date();
-      await project.save();
-      
-      console.log(`Project ${projectId} state updated to In Progress`);
-      
+      // Respond with appropriate message based on whether recent search exists
       res.json({ 
-        message: 'Search triggered successfully',
+        message: recentSearchExists 
+          ? 'Search triggered successfully. Recent discoveries exist, so the system will evaluate if a new search is necessary.'
+          : 'Search triggered successfully. The system will search for new information.',
         project: {
           id: project._id,
           name: project.name,
           currentState: project.currentState
-        }
+        },
+        recentSearchExists
       });
     } catch (error) {
       console.error('Trigger search error:', error);

@@ -109,14 +109,14 @@ const ProjectDetail: React.FC = () => {
     setTabValue(newValue);
   };
 
-  const handleTriggerSearch = async () => {
+  const handleTriggerSearch = async (force: boolean = false) => {
     if (!id) return;
     
     try {
       setIsSearching(true);
       
       // Show a toast or notification that search is running
-      const searchResponse = await apiService.triggerSearch(id);
+      const searchResponse = await apiService.triggerSearch(id, force);
       
       // Update the project status to show it's in progress
       if (project) {
@@ -131,7 +131,11 @@ const ProjectDetail: React.FC = () => {
       }
       
       // Show a success message that search is running in the background
-      setSuccessMessage('Search triggered successfully! The system is now searching for new information in the background. This may take a few minutes to complete.');
+      // Use the message from the API if available
+      const message = searchResponse.data.message || 
+        'Search triggered successfully! The system is now searching for new information in the background. This may take a few minutes to complete.';
+      
+      setSuccessMessage(message);
       setError('');
       
       // Refresh discoveries after search
@@ -192,7 +196,7 @@ const ProjectDetail: React.FC = () => {
             </Tooltip>
             <Tooltip title="Trigger Search">
               <IconButton 
-                onClick={handleTriggerSearch}
+                onClick={() => handleTriggerSearch(false)}
                 disabled={isSearching}
                 aria-label="trigger search"
                 color="primary"
@@ -342,11 +346,20 @@ const ProjectDetail: React.FC = () => {
             <Box sx={{ mt: 3, display: 'flex', gap: 2 }}>
               <Button
                 variant="contained"
-                onClick={handleTriggerSearch}
+                onClick={() => handleTriggerSearch(false)}
                 disabled={isSearching}
                 startIcon={isSearching ? <CircularProgress size={20} color="inherit" /> : <RefreshIcon />}
               >
                 {isSearching ? 'Searching...' : 'Search for Updates'}
+              </Button>
+              <Button
+                variant="outlined"
+                color="secondary"
+                onClick={() => handleTriggerSearch(true)}
+                disabled={isSearching}
+                startIcon={isSearching ? <CircularProgress size={20} color="inherit" /> : <RefreshIcon />}
+              >
+                Force New Search
               </Button>
               <Button
                 variant="outlined"

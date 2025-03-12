@@ -104,20 +104,24 @@ const ProjectSummary: React.FC<ProjectSummaryProps> = ({ projectId }) => {
   // Calculate if summary needs refresh (older than 24 hours or has new discoveries)
   const needsRefresh = summaryAge > 24 || newDiscoveriesCount > 0;
 
-  const generateSummary = async () => {
+  const generateSummary = async (force: boolean = false) => {
     try {
       setGenerating(true);
       setError('');
       
       // First trigger a search to find new discoveries
-      const searchResponse = await apiService.triggerSearch(projectId);
+      const searchResponse = await apiService.triggerSearch(projectId, force);
       
       // Show a message that the search is running in the background
       setSummary(prev => {
         const backgroundMessage = `
 ## 🔍 Search triggered successfully! 
 
-The system is now searching for new information related to your project. This process runs in the background and may take a few minutes to complete.
+${searchResponse.data.recentSearchExists && !force 
+  ? 'The system is evaluating if a new search is necessary based on recent discoveries and project context.'
+  : 'The system is now searching for new information related to your project.'}
+
+This process runs in the background and may take a few minutes to complete.
 
 ${prev ? '\n\n### Previous summary:\n' + prev : ''}`;
         return backgroundMessage;
@@ -214,15 +218,27 @@ Check back later to see the results, or refresh this page.`);
                 )}
               </Typography>
             )}
-            <Button
-              variant={needsRefresh ? "contained" : "outlined"}
-              startIcon={<RefreshIcon />}
-              onClick={generateSummary}
-              disabled={generating}
-              color={needsRefresh ? "primary" : "inherit"}
-            >
-              {generating ? 'Generating...' : needsRefresh ? 'Update Summary' : 'Generate New Summary'}
-            </Button>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button
+                variant={needsRefresh ? "contained" : "outlined"}
+                startIcon={<RefreshIcon />}
+                onClick={() => generateSummary(false)}
+                disabled={generating}
+                color={needsRefresh ? "primary" : "inherit"}
+              >
+                {generating ? 'Generating...' : needsRefresh ? 'Update Summary' : 'Generate Summary'}
+              </Button>
+              <Button
+                variant="outlined"
+                startIcon={<RefreshIcon />}
+                onClick={() => generateSummary(true)}
+                disabled={generating}
+                color="secondary"
+                size="small"
+              >
+                Force New
+              </Button>
+            </Box>
           </Box>
         </Box>
         

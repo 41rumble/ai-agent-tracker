@@ -143,8 +143,8 @@ export const apiService = {
     api.delete(endpoints.schedules.detail(id)),
   
   // Agent
-  triggerSearch: (projectId: string) => 
-    api.post(endpoints.agent.search, { projectId }),
+  triggerSearch: (projectId: string, force: boolean = false) => 
+    api.post(endpoints.agent.search, { projectId, force }),
   
   getRecommendations: (projectId: string) => 
     api.get(`${endpoints.agent.recommendations}?projectId=${projectId}`),

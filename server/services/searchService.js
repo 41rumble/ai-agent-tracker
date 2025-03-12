@@ -2,6 +2,7 @@ const axios = require('axios');
 const apiConfig = require('../config/apiConfig');
 const Discovery = require('../models/Discovery');
 const Project = require('../models/Project');
+const mongoose = require('mongoose');
 const openaiService = require('./openaiService');
 const assistantsService = require('./assistantsService');
 const { OpenAI } = require('openai');
@@ -295,6 +296,38 @@ const searchService = {
       console.log(`Project goals: ${project.goals.join(', ')}`);
       console.log(`Project interests: ${project.interests.join(', ')}`);
       
+      // Check if we've searched recently (within the last 6 hours)
+      const sixHoursAgo = new Date();
+      sixHoursAgo.setHours(sixHoursAgo.getHours() - 6);
+      
+      // Get recent discoveries for this project
+      const recentDiscoveries = await Discovery.find({
+        projectId: project._id,
+        createdAt: { $gt: sixHoursAgo }
+      }).countDocuments();
+      
+      // If we have recent discoveries and the project was updated recently, 
+      // we might not need a new search
+      if (recentDiscoveries > 0 && new Date(project.currentState.lastUpdated) > sixHoursAgo) {
+        console.log(`Found ${recentDiscoveries} recent discoveries from the last 6 hours. Checking if new search is needed...`);
+        
+        // Use AI to decide if a new search is needed based on context
+        const needsNewSearch = await searchService.evaluateSearchNecessity(project, recentDiscoveries);
+        
+        if (!needsNewSearch) {
+          console.log(`AI determined that a new search is not necessary at this time. Using existing discoveries.`);
+          
+          // Return existing discoveries instead of performing a new search
+          const existingDiscoveries = await Discovery.find({ projectId: project._id })
+            .sort({ discoveredAt: -1 })
+            .limit(10);
+            
+          return existingDiscoveries;
+        }
+        
+        console.log(`AI determined that a new search is necessary despite recent discoveries.`);
+      }
+      
       // Generate search queries based on project
       console.log('Generating search queries...');
       const queries = await openaiService.generateSearchQueries(project._id, project);
@@ -305,6 +338,83 @@ const searchService = {
       console.error('Project search error:', error);
       console.error('Error stack:', error.stack);
       throw new Error('Failed to perform project search');
+    }
+  },
+  
+  /**
+   * Evaluate if a new search is necessary based on project context
+   */
+  evaluateSearchNecessity: async (project, recentDiscoveriesCount) => {
+    try {
+      // Get project context
+      const context = await mongoose.model('ProjectContext').findOne({ projectId: project._id });
+      
+      // Get recent user responses
+      let recentResponses = [];
+      if (context) {
+        recentResponses = context.contextEntries
+          .filter(entry => entry.type === 'user_response')
+          .slice(-3)
+          .map(entry => entry.content);
+      }
+      
+      // Use OpenAI to decide if a new search is needed
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4-turbo",
+        messages: [
+          {
+            role: "system",
+            content: `You are an AI assistant that helps determine if a new search for information is necessary.
+            Your task is to analyze the project context and recent discoveries to decide if a new search would be valuable.`
+          },
+          {
+            role: "user",
+            content: `Determine if a new search for information is necessary for this project:
+            
+            Project name: ${project.name}
+            Project domain: ${project.domain}
+            Project goals: ${project.goals.join(', ')}
+            Project interests: ${project.interests.join(', ')}
+            Project phase: ${project.currentState.progress}
+            Last updated: ${new Date(project.currentState.lastUpdated).toISOString()}
+            
+            Recent discoveries in the last 6 hours: ${recentDiscoveriesCount}
+            
+            Recent user responses:
+            ${recentResponses.join('\n')}
+            
+            Consider these factors:
+            1. If the user has explicitly asked for new information
+            2. If the project was recently updated with significant changes
+            3. If the recent discoveries are sufficient for the current project phase
+            4. If the user's recent responses indicate a need for more information
+            
+            Return your decision as JSON: {"needsNewSearch": true/false, "reasoning": "explanation"}`
+          }
+        ],
+        response_format: { type: "json_object" }
+      });
+      
+      const decisionText = completion.choices[0].message.content;
+      let decision;
+      
+      try {
+        decision = JSON.parse(decisionText);
+      } catch (parseError) {
+        console.error('Error parsing search necessity decision:', parseError);
+        console.error('Raw content:', decisionText);
+        // Default to performing a search if parsing fails
+        return true;
+      }
+      
+      console.log(`Search necessity evaluation: ${decision.needsNewSearch ? 'New search needed' : 'No new search needed'}`);
+      console.log(`Reasoning: ${decision.reasoning}`);
+      
+      return decision.needsNewSearch;
+    } catch (error) {
+      console.error('Error evaluating search necessity:', error);
+      // Default to performing a search if evaluation fails
+      return true;
     }
   },
   
