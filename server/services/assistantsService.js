@@ -2,6 +2,54 @@ const { OpenAI } = require('openai');
 const apiConfig = require('../config/apiConfig');
 const Project = require('../models/Project');
 const Discovery = require('../models/Discovery');
+const { URL } = require('url');
+const axios = require('axios');
+
+/**
+ * Validates a URL by checking its format and attempting to access it
+ * @param {string} url - The URL to validate
+ * @returns {Promise<{isValid: boolean, reason?: string}>} - Validation result
+ */
+const validateUrl = async (url) => {
+  try {
+    // Check if URL is properly formatted
+    const parsedUrl = new URL(url);
+    
+    // Check if URL uses http or https protocol
+    if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+      return { isValid: false, reason: 'Invalid protocol' };
+    }
+    
+    // Try to access the URL with a HEAD request (doesn't download the full page)
+    // Set a timeout to avoid waiting too long
+    const response = await axios.head(url, { 
+      timeout: 5000,
+      validateStatus: status => status < 500 // Accept any status < 500 to check if page exists
+    });
+    
+    // Check if the response status indicates the page exists
+    if (response.status >= 400) {
+      return { isValid: false, reason: `HTTP status ${response.status}` };
+    }
+    
+    return { isValid: true };
+  } catch (error) {
+    console.log(`URL validation error for ${url}:`, error.message);
+    
+    // Different error handling based on error type
+    if (error.code === 'ENOTFOUND') {
+      return { isValid: false, reason: 'Domain not found' };
+    } else if (error.code === 'ETIMEDOUT' || error.code === 'ECONNABORTED') {
+      return { isValid: false, reason: 'Connection timeout' };
+    } else if (error.response && error.response.status >= 400) {
+      return { isValid: false, reason: `HTTP status ${error.response.status}` };
+    } else if (error instanceof TypeError) {
+      return { isValid: false, reason: 'Invalid URL format' };
+    }
+    
+    return { isValid: false, reason: 'Unknown error' };
+  }
+};
 
 const openai = new OpenAI({
   apiKey: apiConfig.openai.apiKey
