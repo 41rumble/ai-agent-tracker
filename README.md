@@ -61,6 +61,9 @@ JWT_EXPIRY=24h
 # Optional: Enable OpenAI's web search capability (requires gpt-4o-search-preview access)
 ENABLE_OPENAI_WEB_SEARCH=true
 
+# Optional: Enable OpenAI's Assistants API with web search (recommended)
+ENABLE_OPENAI_ASSISTANTS=true
+
 # Optional: Google Search fallback (if OpenAI web search is not available)
 GOOGLE_SEARCH_API_KEY=your_google_search_api_key
 GOOGLE_SEARCH_CX=your_google_search_cx
@@ -96,11 +99,22 @@ npm start
 
 ## Search Capabilities
 
-The application supports two methods for searching the web:
+The application supports three methods for searching the web, with automatic fallback:
 
-### OpenAI Web Search (Recommended)
+### OpenAI Assistants API (Recommended)
 
-If you have access to OpenAI's `gpt-4o-search-preview` model, you can enable this feature by setting `ENABLE_OPENAI_WEB_SEARCH=true` in your `.env` file. This provides:
+If you have access to OpenAI's Assistants API, you can enable this feature by setting `ENABLE_OPENAI_ASSISTANTS=true` in your `.env` file. This provides:
+
+- Dedicated AI assistants for each project
+- Persistent threads for ongoing conversations
+- Built-in web search capabilities
+- Advanced reasoning and analysis of search results
+- Automatic categorization and relevance scoring
+- Focus on recent content from the past 3 months
+
+### OpenAI Web Search (Alternative)
+
+If you have access to OpenAI's `gpt-4o-search-preview` model but not the Assistants API, you can enable this feature by setting `ENABLE_OPENAI_WEB_SEARCH=true` in your `.env` file. This provides:
 
 - Real-time web search results from the internet
 - Automatic citation of sources
@@ -109,7 +123,7 @@ If you have access to OpenAI's `gpt-4o-search-preview` model, you can enable thi
 
 ### Google-it Fallback
 
-If OpenAI web search is not available or fails, the system falls back to using the `google-it` package, which:
+If neither OpenAI option is available or if they fail, the system falls back to using the `google-it` package, which:
 
 - Scrapes Google search results
 - Validates all URLs before processing

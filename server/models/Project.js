@@ -52,6 +52,12 @@ const ProjectSchema = new Schema({
   },
   agentId: {
     type: String
+  },
+  assistantId: {
+    type: String
+  },
+  threadId: {
+    type: String
   }
 }, { timestamps: true });
 

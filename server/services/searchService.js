@@ -3,6 +3,7 @@ const apiConfig = require('../config/apiConfig');
 const Discovery = require('../models/Discovery');
 const Project = require('../models/Project');
 const openaiService = require('./openaiService');
+const assistantsService = require('./assistantsService');
 const { OpenAI } = require('openai');
 const { URL } = require('url');
 const googleIt = require('google-it');
@@ -236,8 +237,40 @@ const searchService = {
     }
   },
   
-  performWebSearch: async (query) => {
-    // Try OpenAI web search first if enabled, otherwise fall back to google-it
+  performAssistantSearch: async (query, project) => {
+    try {
+      console.log(`Performing Assistant API search for query: "${query}"`);
+      
+      // Use the Assistants API to perform the search
+      const results = await assistantsService.performAssistantSearch(project, query);
+      
+      console.log(`Assistant API search returned ${results.length} results`);
+      return results;
+    } catch (error) {
+      console.error(`Assistant API search error: ${error}`);
+      console.error('Error stack:', error.stack);
+      
+      // Fall back to other search methods
+      console.log('Falling back to alternative search methods...');
+      if (apiConfig.openai.webSearchEnabled) {
+        return await searchService.performOpenAIWebSearch(query);
+      } else {
+        return await searchService.performGoogleItSearch(query);
+      }
+    }
+  },
+  
+  performWebSearch: async (query, project = null) => {
+    // Try Assistants API first if project is provided
+    if (project && apiConfig.openai.assistantsEnabled) {
+      try {
+        return await searchService.performAssistantSearch(query, project);
+      } catch (error) {
+        console.error('Assistants API search failed, falling back to other methods:', error);
+      }
+    }
+    
+    // Try OpenAI web search next if enabled
     if (apiConfig.openai.webSearchEnabled) {
       try {
         return await searchService.performOpenAIWebSearch(query);
@@ -246,6 +279,7 @@ const searchService = {
         return await searchService.performGoogleItSearch(query);
       }
     } else {
+      // Fall back to google-it
       return await searchService.performGoogleItSearch(query);
     }
   },
@@ -295,7 +329,7 @@ const searchService = {
     for (const query of queries) {
       try {
         console.log(`Executing search for query: "${query}"`);
-        const results = await searchService.performWebSearch(query);
+        const results = await searchService.performWebSearch(query, project);
         console.log(`Search returned ${results.length} results for query "${query}"`);
         allResults = [...allResults, ...results];
       } catch (searchError) {
