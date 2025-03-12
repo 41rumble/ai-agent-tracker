@@ -1,5 +1,6 @@
 const Project = require('../models/Project');
 const searchService = require('../services/searchService');
+const notificationService = require('../services/notificationService');
 
 const agentController = {
   triggerSearch: async (req, res) => {
@@ -35,6 +36,13 @@ const agentController = {
       searchService.performProjectSearch(project)
         .then(results => {
           console.log(`Search completed for project ${projectId} with ${results.length} results`);
+          
+          // Send notifications about new discoveries if enabled
+          if (results.length > 0) {
+            notificationService.notifyAboutDiscoveries(projectId, results)
+              .then(() => console.log(`Notifications sent for project ${projectId}`))
+              .catch(notifyError => console.error(`Error sending notifications for project ${projectId}:`, notifyError));
+          }
         })
         .catch(error => {
           console.error(`Search failed for project ${projectId}:`, error);

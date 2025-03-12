@@ -58,6 +58,35 @@ const ProjectSchema = new Schema({
   },
   threadId: {
     type: String
+  },
+  agentType: {
+    type: Schema.Types.ObjectId,
+    ref: 'AgentType'
+  },
+  notificationPreferences: {
+    email: {
+      enabled: {
+        type: Boolean,
+        default: false
+      },
+      frequency: {
+        type: String,
+        enum: ['immediate', 'daily', 'weekly'],
+        default: 'daily'
+      }
+    },
+    slack: {
+      enabled: {
+        type: Boolean,
+        default: false
+      },
+      webhookUrl: {
+        type: String
+      },
+      channel: {
+        type: String
+      }
+    }
   }
 }, { timestamps: true });
 

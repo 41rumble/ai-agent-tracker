@@ -1,8 +1,10 @@
 const cron = require('node-cron');
 const Schedule = require('../models/Schedule');
 const Project = require('../models/Project');
+const User = require('../models/User');
 const searchService = require('./searchService');
 const openaiService = require('./openaiService');
+const notificationService = require('./notificationService');
 
 const schedulerService = {
   initializeScheduler: async () => {
@@ -15,9 +17,73 @@ const schedulerService = {
         await schedulerService.processScheduledTasks();
       });
       
+      // Set up daily digest job (runs at 8:00 AM)
+      cron.schedule('0 8 * * *', async () => {
+        console.log('Running daily email digest...');
+        await schedulerService.processDailyDigests();
+      });
+      
+      // Set up weekly digest job (runs at 9:00 AM on Mondays)
+      cron.schedule('0 9 * * 1', async () => {
+        console.log('Running weekly email digest...');
+        await schedulerService.processWeeklyDigests();
+      });
+      
       console.log('Scheduler initialized');
     } catch (error) {
       console.error('Scheduler initialization error:', error);
+    }
+  },
+  
+  processDailyDigests: async () => {
+    try {
+      // Find all users with projects that have daily email notifications enabled
+      const projects = await Project.find({
+        'notificationPreferences.email.enabled': true,
+        'notificationPreferences.email.frequency': 'daily'
+      });
+      
+      // Get unique user IDs
+      const userIds = [...new Set(projects.map(project => project.userId.toString()))];
+      
+      console.log(`Processing daily digests for ${userIds.length} users`);
+      
+      // Process each user's digest
+      for (const userId of userIds) {
+        try {
+          await notificationService.sendDailyDigest(userId);
+        } catch (error) {
+          console.error(`Error sending daily digest for user ${userId}:`, error);
+        }
+      }
+    } catch (error) {
+      console.error('Process daily digests error:', error);
+    }
+  },
+  
+  processWeeklyDigests: async () => {
+    try {
+      // Find all users with projects that have weekly email notifications enabled
+      const projects = await Project.find({
+        'notificationPreferences.email.enabled': true,
+        'notificationPreferences.email.frequency': 'weekly'
+      });
+      
+      // Get unique user IDs
+      const userIds = [...new Set(projects.map(project => project.userId.toString()))];
+      
+      console.log(`Processing weekly digests for ${userIds.length} users`);
+      
+      // Process each user's digest
+      for (const userId of userIds) {
+        try {
+          await notificationService.sendWeeklyDigest(userId);
+        } catch (error) {
+          console.error(`Error sending weekly digest for user ${userId}:`, error);
+        }
+      }
+    } catch (error) {
+      console.error('Process weekly digests error:', error);
     }
   },
   

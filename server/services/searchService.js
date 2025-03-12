@@ -217,7 +217,25 @@ const searchService = {
     try {
       console.log(`Performing Assistant API search for query: "${query}"`);
       
-      // Use the Assistants API to perform the search
+      // Check if specialized agents are enabled
+      if (apiConfig.openai.specializedAgentsEnabled) {
+        try {
+          // Try to use specialized agent first
+          const specializedAgentService = require('./specializedAgentService');
+          console.log(`Attempting specialized agent search for project ${project._id}`);
+          
+          const results = await specializedAgentService.performSpecializedSearch(project, query);
+          console.log(`Specialized agent search returned ${results.length} results`);
+          return results;
+        } catch (specializedError) {
+          console.error(`Specialized agent search error: ${specializedError}`);
+          console.error('Error stack:', specializedError.stack);
+          console.log('Falling back to standard assistant search...');
+          // Fall through to standard assistant search
+        }
+      }
+      
+      // Use the standard Assistants API to perform the search
       const results = await assistantsService.performAssistantSearch(project, query);
       
       console.log(`Assistant API search returned ${results.length} results`);

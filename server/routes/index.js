@@ -6,6 +6,7 @@ const discoveryRoutes = require('./discoveryRoutes');
 const scheduleRoutes = require('./scheduleRoutes');
 const agentRoutes = require('./agentRoutes');
 const contextAgentRoutes = require('./contextAgentRoutes');
+const agentTypeRoutes = require('./agentTypeRoutes');
 
 router.use('/auth', authRoutes);
 router.use('/projects', projectRoutes);
@@ -13,6 +14,7 @@ router.use('/discoveries', discoveryRoutes);
 router.use('/schedules', scheduleRoutes);
 router.use('/agent', agentRoutes);
 router.use('/context-agent', contextAgentRoutes);
+router.use('/agent-types', agentTypeRoutes);
 
 // Health check route
 router.get('/health', (req, res) => {
