@@ -10,6 +10,11 @@ const config = require('../config');
 
 // Newsletter sources to monitor - can be expanded later via UI
 const NEWSLETTER_SOURCES = [
+  // Primary sources specified by the user
+  'news@alphasignal.ai',
+  'superhuman@mail.joinsuperhuman.ai',
+  
+  // Additional industry sources
   'newsletter@siggraph.org',
   'news@fxguide.com',
   'newsletter@awn.com',
@@ -183,7 +188,25 @@ async function checkEmailsForUser(userId) {
                   const from = parsed.from.text;
                   const subject = parsed.subject;
                   const date = parsed.date;
-                  const content = parsed.text || parsed.html;
+                  
+                  // Prefer HTML content for better URL extraction, but fall back to text
+                  let content = '';
+                  if (parsed.html) {
+                    // Keep HTML content for better URL extraction
+                    content = parsed.html;
+                    console.log('Using HTML content for better URL extraction');
+                  } else if (parsed.text) {
+                    content = parsed.text;
+                    console.log('Using plain text content');
+                  } else {
+                    console.log('No content found in email');
+                    emailsToProcess--;
+                    if (emailsToProcess === 0) {
+                      imap.end();
+                      resolve({ emailsProcessed: processedCount });
+                    }
+                    return;
+                  }
                   
                   console.log(`Processing email: ${subject} from ${from}`);
                   

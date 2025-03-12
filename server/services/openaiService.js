@@ -242,15 +242,31 @@ const openaiService = {
         ? content.substring(0, 15000) + '...(content truncated)'
         : content;
       
+      // Special handling for known newsletter sources
+      let systemPrompt = `You are an AI assistant that analyzes newsletter content to extract relevant information for a project. 
+      The project is about ${context.projectDomain} with a focus on ${context.projectGoals.join(', ')} and interests in ${context.projectInterests.join(', ')}.
+      
+      Your task is to identify distinct pieces of information in the newsletter that are relevant to the project and format them as structured discoveries.`;
+      
+      // Add special instructions for specific newsletters
+      if (context.newsletterName.includes('alphasignal.ai')) {
+        systemPrompt += `\n\nThis is an AlphaSignal newsletter which typically contains AI news and research updates. 
+        Pay special attention to any mentions of AI in VFX, animation, or creative tools. 
+        Be sure to extract any URLs that point to original research papers, articles, or tools.`;
+      }
+      
+      if (context.newsletterName.includes('joinsuperhuman.ai')) {
+        systemPrompt += `\n\nThis is a Superhuman newsletter which often contains curated AI news and developments.
+        Look carefully for any mentions of AI in creative fields, especially visual effects, animation, or digital content creation.
+        Extract all URLs that link to original sources, research papers, or tools mentioned in the newsletter.`;
+      }
+      
       const completion = await openai.chat.completions.create({
         model: "gpt-4-turbo",
         messages: [
           {
             role: "system",
-            content: `You are an AI assistant that analyzes newsletter content to extract relevant information for a project. 
-            The project is about ${context.projectDomain} with a focus on ${context.projectGoals.join(', ')} and interests in ${context.projectInterests.join(', ')}.
-            
-            Your task is to identify distinct pieces of information in the newsletter that are relevant to the project and format them as structured discoveries.`
+            content: systemPrompt
           },
           {
             role: "user",
@@ -269,10 +285,17 @@ const openaiService = {
             For each relevant piece of information, create a structured discovery with:
             1. Title: A concise, descriptive title
             2. Description: A summary of the information and why it's relevant to the project
-            3. Source: The original source if mentioned, otherwise use the newsletter name
+            3. Source: The original source URL if mentioned in the newsletter, otherwise use the newsletter name
             4. Relevance Score: A number from 1-10 indicating how relevant this is to the project
             5. Categories: 2-5 categories that this information falls under
             6. Type: One of [Article, Discussion, News, Research, Tool, Other]
+            
+            IMPORTANT INSTRUCTIONS:
+            - Extract ALL URLs mentioned in the newsletter that point to relevant content
+            - If multiple discoveries come from the same article/source, create separate entries for each distinct insight
+            - For research papers, include the paper title and authors in the description
+            - For tools, include information about availability, pricing, or access if mentioned
+            - If the newsletter mentions AI models like Omnihuman-1, make sure to extract those as high-relevance discoveries
             
             Format your response as a JSON object with an array of discoveries. Only include information that is actually relevant to the project.
             
