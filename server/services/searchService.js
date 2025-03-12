@@ -4,10 +4,57 @@ const Discovery = require('../models/Discovery');
 const Project = require('../models/Project');
 const openaiService = require('./openaiService');
 const { OpenAI } = require('openai');
+const { URL } = require('url');
 
 const openai = new OpenAI({
   apiKey: apiConfig.openai.apiKey
 });
+
+/**
+ * Validates a URL by checking its format and attempting to access it
+ * @param {string} url - The URL to validate
+ * @returns {Promise<{isValid: boolean, reason?: string}>} - Validation result
+ */
+const validateUrl = async (url) => {
+  try {
+    // Check if URL is properly formatted
+    const parsedUrl = new URL(url);
+    
+    // Check if URL uses http or https protocol
+    if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+      return { isValid: false, reason: 'Invalid protocol' };
+    }
+    
+    // Try to access the URL with a HEAD request (doesn't download the full page)
+    // Set a timeout to avoid waiting too long
+    const response = await axios.head(url, { 
+      timeout: 5000,
+      validateStatus: status => status < 500 // Accept any status < 500 to check if page exists
+    });
+    
+    // Check if the response status indicates the page exists
+    if (response.status >= 400) {
+      return { isValid: false, reason: `HTTP status ${response.status}` };
+    }
+    
+    return { isValid: true };
+  } catch (error) {
+    console.log(`URL validation error for ${url}:`, error.message);
+    
+    // Different error handling based on error type
+    if (error.code === 'ENOTFOUND') {
+      return { isValid: false, reason: 'Domain not found' };
+    } else if (error.code === 'ETIMEDOUT' || error.code === 'ECONNABORTED') {
+      return { isValid: false, reason: 'Connection timeout' };
+    } else if (error.response && error.response.status >= 400) {
+      return { isValid: false, reason: `HTTP status ${error.response.status}` };
+    } else if (error instanceof TypeError) {
+      return { isValid: false, reason: 'Invalid URL format' };
+    }
+    
+    return { isValid: false, reason: 'Unknown error' };
+  }
+};
 
 const searchService = {
   performWebSearch: async (query) => {
@@ -155,19 +202,25 @@ const searchService = {
     // Store relevant discoveries
     console.log('Storing relevant discoveries...');
     let storedCount = 0;
+    let skippedCount = 0;
     for (const result of processedResults) {
       if (result.relevanceScore >= 5) { // Only store relevant results
         try {
-          await searchService.storeDiscovery(project._id, result);
-          storedCount++;
+          const stored = await searchService.storeDiscovery(project._id, result);
+          if (stored) {
+            storedCount++;
+          } else {
+            skippedCount++;
+          }
         } catch (storeError) {
           console.error('Error storing discovery:', storeError);
           console.error('Store error details:', storeError.stack || storeError);
+          skippedCount++;
         }
       }
     }
     
-    console.log(`Stored ${storedCount} relevant discoveries for project ${project._id}`);
+    console.log(`Stored ${storedCount} relevant discoveries for project ${project._id}, skipped ${skippedCount} invalid ones`);
     
     // Update project state to indicate search is complete
     try {
@@ -208,12 +261,22 @@ const searchService = {
                 Source: ${result.source}
                 
                 Provide a relevance score from 0-10 (where 10 is extremely relevant) and categorize this result.
-                Also classify this result into one of these types: Article, Discussion, News, Research, Tool, or Other.
+                
+                IMPORTANT: Carefully classify this result into one of these types:
+                - Article: Blog posts, articles, or written content
+                - Discussion: Forum posts, Q&A, conversations
+                - News: Recent announcements, press releases, news articles
+                - Research: Academic papers, studies, in-depth analysis
+                - Tool: Software tools, libraries, frameworks, products
+                - Other: Content that doesn't fit the above categories
+                
+                Be precise in your classification. Don't default to Article unless it truly is an article.
                 
                 Format your response as JSON: {
                   "relevanceScore": number, 
                   "categories": ["category1", "category2"],
-                  "type": "Article|Discussion|News|Research|Tool|Other"
+                  "type": "Article|Discussion|News|Research|Tool|Other",
+                  "reasoning": "Brief explanation of why this type was chosen"
                 }`
               }
             ]
@@ -250,6 +313,17 @@ const searchService = {
   
   storeDiscovery: async (projectId, result) => {
     try {
+      // Validate the URL before proceeding
+      console.log(`Validating URL: ${result.source}`);
+      const urlValidation = await validateUrl(result.source);
+      
+      if (!urlValidation.isValid) {
+        console.log(`Skipping invalid URL ${result.source}: ${urlValidation.reason}`);
+        return null;
+      }
+      
+      console.log(`URL validation successful for: ${result.source}`);
+      
       // Check if this discovery already exists
       const existingDiscovery = await Discovery.findOne({
         projectId,
@@ -279,16 +353,18 @@ const searchService = {
         console.log(`Generated random recent date: ${publicationDate}`);
       }
       
+      // Ensure the type is properly set and not defaulting to Article
+      const type = result.type || 'Other';
+      console.log(`Discovery type: ${type}`);
+      
       if (existingDiscovery) {
         // Update existing discovery if relevance score is higher
         if (result.relevanceScore > existingDiscovery.relevanceScore) {
           existingDiscovery.relevanceScore = result.relevanceScore;
           existingDiscovery.categories = result.categories;
           
-          // Update type if available
-          if (result.type) {
-            existingDiscovery.type = result.type;
-          }
+          // Update type
+          existingDiscovery.type = type;
           
           // Update publication date if available
           if (publicationDate) {
@@ -308,7 +384,7 @@ const searchService = {
         source: result.source,
         relevanceScore: result.relevanceScore,
         categories: result.categories,
-        type: result.type || 'Article',
+        type: type,
         publicationDate: publicationDate,
         discoveredAt: new Date()
       });

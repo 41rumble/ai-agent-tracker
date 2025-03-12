@@ -164,14 +164,17 @@ const DiscoveryList: React.FC<DiscoveryListProps> = ({ projectId }) => {
   
   // Group discoveries by type for the "All" tab
   const groupedDiscoveries = discoveryTypes.slice(1).map(type => {
+    const typeDiscoveries = discoveries.filter(d => 
+      d.type === type && 
+      (d.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
+       d.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+       d.categories.some(category => category.toLowerCase().includes(searchTerm.toLowerCase())))
+    );
+    
     return {
       type,
-      items: discoveries.filter(d => 
-        d.type === type && 
-        (d.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
-         d.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-         d.categories.some(category => category.toLowerCase().includes(searchTerm.toLowerCase())))
-      ).slice(0, 3) // Only show top 3 for each type in the "All" view
+      items: typeDiscoveries.slice(0, 3), // Only show top 3 for each type in the "All" view
+      totalCount: typeDiscoveries.length
     };
   }).filter(group => group.items.length > 0);
 
@@ -245,12 +248,12 @@ const DiscoveryList: React.FC<DiscoveryListProps> = ({ projectId }) => {
                         <Typography variant="h6" component="h2">
                           {group.type}
                         </Typography>
-                        {group.items.length > 3 && (
+                        {group.totalCount > 3 && (
                           <Button 
                             size="small" 
                             onClick={() => setTabValue(discoveryTypes.indexOf(group.type))}
                           >
-                            View All ({discoveries.filter(d => d.type === group.type).length})
+                            View All ({group.totalCount})
                           </Button>
                         )}
                       </Box>
