@@ -172,8 +172,10 @@ Check back later to see the results, or refresh this page.`);
 
   // Calculate time since last update
   useEffect(() => {
+    let interval: NodeJS.Timeout | null = null;
+    
     if (lastUpdated) {
-      const interval = setInterval(() => {
+      interval = setInterval(() => {
         const now = new Date();
         const hoursSinceUpdate = Math.floor((now.getTime() - lastUpdated.getTime()) / (1000 * 60 * 60));
         setSummaryAge(hoursSinceUpdate);
@@ -183,9 +185,13 @@ Check back later to see the results, or refresh this page.`);
       const now = new Date();
       const hoursSinceUpdate = Math.floor((now.getTime() - lastUpdated.getTime()) / (1000 * 60 * 60));
       setSummaryAge(hoursSinceUpdate);
-      
-      return () => clearInterval(interval);
     }
+    
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
   }, [lastUpdated]);
 
   return (

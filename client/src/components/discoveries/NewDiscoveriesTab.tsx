@@ -314,13 +314,17 @@ const NewDiscoveriesTab: React.FC<NewDiscoveriesTabProps> = ({ projectId }) => {
         } : d
       ));
       
+      // Get the discovery to check if it was already viewed
+      const discovery = discoveries.find(d => d._id === id);
+      const wasAlreadyViewed = discovery?.viewed || false;
+      
       // Update counts
       setCounts({
         ...counts,
         useful: isUseful ? counts.useful + 1 : counts.useful,
         notUseful: !isUseful ? counts.notUseful + 1 : counts.notUseful,
-        new: d => d.viewed ? counts.new : counts.new - 1,
-        viewed: d => d.viewed ? counts.viewed : counts.viewed + 1
+        new: wasAlreadyViewed ? counts.new : counts.new - 1,
+        viewed: wasAlreadyViewed ? counts.viewed : counts.viewed + 1
       });
       
       setSuccessMessage(`Feedback saved: ${isUseful ? 'Useful' : 'Not Useful'}`);
