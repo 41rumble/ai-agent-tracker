@@ -1,6 +1,22 @@
 import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
 
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:3000/api';
+// Get the API base URL from environment variables or construct it dynamically
+let API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
+
+// If not explicitly set, try to construct it based on the current window location
+if (!API_BASE_URL && typeof window !== 'undefined') {
+  // Default to the same host but with port 3000 (or whatever is configured)
+  const serverPort = process.env.REACT_APP_SERVER_PORT || '3000';
+  const protocol = window.location.protocol;
+  const hostname = window.location.hostname;
+  API_BASE_URL = `${protocol}//${hostname}:${serverPort}/api`;
+  
+  console.log(`API base URL constructed dynamically: ${API_BASE_URL}`);
+} else {
+  // Fallback to localhost if all else fails
+  API_BASE_URL = API_BASE_URL || 'http://localhost:3000/api';
+  console.log(`Using configured API base URL: ${API_BASE_URL}`);
+}
 
 // Create axios instance with default config
 const api = axios.create({
@@ -9,6 +25,8 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  // Enable cookies and credentials for cross-origin requests
+  withCredentials: true
 });
 
 // Request interceptor for adding auth token

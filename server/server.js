@@ -10,10 +10,24 @@ const app = express();
 
 // Middleware
 app.use(express.json());
-app.use(cors({
-  origin: apiConfig.cors.allowedOrigins,
-  credentials: true
-}));
+
+// Configure CORS to allow requests from any origin in development
+const corsOptions = {
+  origin: process.env.NODE_ENV === 'production' 
+    ? apiConfig.cors.allowedOrigins 
+    : true, // Allow all origins in development
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+};
+
+app.use(cors(corsOptions));
+
+// Log CORS configuration
+console.log('CORS configuration:', {
+  environment: process.env.NODE_ENV || 'development',
+  origins: process.env.NODE_ENV === 'production' ? apiConfig.cors.allowedOrigins : 'All origins allowed'
+});
 
 // Connect to MongoDB
 mongoose.connect(apiConfig.mongodb.uri)
@@ -41,8 +55,14 @@ app.use((err, req, res, next) => {
 
 // Start server
 const PORT = apiConfig.server.port;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+const HOST = process.env.HOST || 'localhost';
+
+app.listen(PORT, HOST, () => {
+  console.log(`Server running at http://${HOST}:${PORT}`);
+  if (HOST === '0.0.0.0') {
+    console.log('Server is accessible from all network interfaces');
+    console.log('You can access it from other devices using your machine\'s IP address');
+  }
 });
 
 module.exports = app;
