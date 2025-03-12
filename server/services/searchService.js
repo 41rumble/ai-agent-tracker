@@ -147,25 +147,10 @@ const searchService = {
     try {
       console.log(`Performing google-it search for query: "${query}"`);
       
-      // Add time constraint to the query if not already present
-      const threeMonthsAgo = new Date();
-      threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
-      
-      // Format the date for the search query
-      const dateString = threeMonthsAgo.toLocaleString('default', { month: 'long', year: 'numeric' });
-      
       // Clean up the query by removing quotes
       let searchQuery = query.replace(/"/g, '');
       
-      // Add time constraint if not present
-      if (!searchQuery.toLowerCase().includes('after:') && 
-          !searchQuery.toLowerCase().includes('before:') && 
-          !searchQuery.toLowerCase().includes('month') &&
-          !searchQuery.toLowerCase().includes('recent')) {
-        searchQuery = `${searchQuery} recent`;
-      }
-      
-      console.log(`Enhanced search query for google-it: ${searchQuery}`);
+      console.log(`Cleaned search query for google-it: ${searchQuery}`);
       
       // Use google-it to perform a real web search
       const searchResults = await googleIt({ 

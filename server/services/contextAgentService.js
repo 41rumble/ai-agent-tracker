@@ -398,32 +398,9 @@ const contextAgentService = {
         queries = queriesText.match(/"([^"]+)"/g)?.map(q => q.replace(/"/g, '')) || [];
       }
       
-      // Clean up queries to remove any date or time references that might have been included
-      const cleanedQueries = queries.map(query => {
-        // Remove years (2020-2029)
-        let cleaned = query.replace(/\b20(2\d|1\d)\b/g, '');
-        
-        // Remove month names
-        cleaned = cleaned.replace(/\b(January|February|March|April|May|June|July|August|September|October|November|December)\b/gi, '');
-        
-        // Remove time reference words
-        cleaned = cleaned.replace(/\b(recent|latest|new|current|today|upcoming|modern|emerging|this year|past|last)\b/gi, '');
-        
-        // Remove "in the past X" phrases
-        cleaned = cleaned.replace(/\bin the past\s+\w+\b/gi, '');
-        
-        // Remove parenthetical time references
-        cleaned = cleaned.replace(/\s*\(last \d+ months\)\s*/gi, '');
-        
-        // Clean up any double spaces and trim
-        cleaned = cleaned.replace(/\s+/g, ' ').trim();
-        
-        return cleaned;
-      });
+      console.log('Generated contextual queries:', queries);
       
-      console.log('Generated contextual queries:', cleanedQueries);
-      
-      return cleanedQueries;
+      return queries;
     } catch (error) {
       console.error('Error generating contextual search queries:', error);
       throw new Error('Failed to generate contextual search queries');
