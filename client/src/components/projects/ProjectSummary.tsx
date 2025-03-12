@@ -61,7 +61,18 @@ const ProjectSummary: React.FC<ProjectSummaryProps> = ({ projectId }) => {
       setError('');
       
       // First trigger a search to find new discoveries
-      await apiService.triggerSearch(projectId);
+      const searchResponse = await apiService.triggerSearch(projectId);
+      
+      // Show a message that the search is running in the background
+      setSummary(prev => {
+        const backgroundMessage = `
+🔍 Search triggered successfully! 
+
+The system is now searching for new information related to your project. This process runs in the background and may take a few minutes to complete.
+
+${prev ? '\n\nPrevious summary:\n' + prev : ''}`;
+        return backgroundMessage;
+      });
       
       // Then generate a new summary
       const response = await apiService.getRecommendations(projectId);
@@ -70,7 +81,12 @@ const ProjectSummary: React.FC<ProjectSummaryProps> = ({ projectId }) => {
         setSummary(response.data.summary);
         setDiscoveries(response.data.discoveries || []);
       } else {
-        setSummary(null);
+        setSummary(`
+🔍 Search in progress...
+
+The system is currently searching for new information related to your project. This process runs in the background and may take a few minutes to complete.
+
+Check back later to see the results, or refresh this page.`);
       }
     } catch (err: any) {
       setError('Failed to generate summary. Please try again.');

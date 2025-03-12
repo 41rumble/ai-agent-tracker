@@ -79,6 +79,7 @@ const ProjectDetail: React.FC = () => {
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const [tabValue, setTabValue] = useState(0);
   const [isSearching, setIsSearching] = useState(false);
   
@@ -113,7 +114,26 @@ const ProjectDetail: React.FC = () => {
     
     try {
       setIsSearching(true);
-      await apiService.triggerSearch(id);
+      
+      // Show a toast or notification that search is running
+      const searchResponse = await apiService.triggerSearch(id);
+      
+      // Update the project status to show it's in progress
+      if (project) {
+        setProject({
+          ...project,
+          currentState: {
+            ...project.currentState,
+            progress: 'In Progress',
+            lastUpdated: new Date().toISOString()
+          }
+        });
+      }
+      
+      // Show a success message that search is running in the background
+      setSuccessMessage('Search triggered successfully! The system is now searching for new information in the background. This may take a few minutes to complete.');
+      setError('');
+      
       // Refresh discoveries after search
       setTabValue(1); // Switch to discoveries tab
     } catch (err: any) {
@@ -177,7 +197,7 @@ const ProjectDetail: React.FC = () => {
                 aria-label="trigger search"
                 color="primary"
               >
-                <RefreshIcon />
+                {isSearching ? <CircularProgress size={24} /> : <RefreshIcon />}
               </IconButton>
             </Tooltip>
             <Tooltip title="Manage Schedules">
@@ -191,6 +211,16 @@ const ProjectDetail: React.FC = () => {
             </Tooltip>
           </Box>
         </Box>
+        
+        {successMessage && (
+          <Alert 
+            severity="success" 
+            sx={{ mt: 2 }}
+            onClose={() => setSuccessMessage('')}
+          >
+            {successMessage}
+          </Alert>
+        )}
         
         <Divider sx={{ my: 2 }} />
         
@@ -314,7 +344,7 @@ const ProjectDetail: React.FC = () => {
                 variant="contained"
                 onClick={handleTriggerSearch}
                 disabled={isSearching}
-                startIcon={<RefreshIcon />}
+                startIcon={isSearching ? <CircularProgress size={20} color="inherit" /> : <RefreshIcon />}
               >
                 {isSearching ? 'Searching...' : 'Search for Updates'}
               </Button>
