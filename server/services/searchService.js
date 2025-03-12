@@ -63,53 +63,32 @@ const searchService = {
     try {
       console.log(`Performing OpenAI web search for query: "${query}"`);
       
-      // Clean up the query by removing quotes and any explicit date references
+      // Clean up the query by removing quotes
       let searchQuery = query.replace(/"/g, '');
-      
-      // Remove specific date references to let the search API handle recency
-      searchQuery = searchQuery
-        .replace(/\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}\b/gi, '')
-        .replace(/\b(20\d{2})\b/g, '')
-        .replace(/\bpast 3 months\b/gi, '')
-        .replace(/\bfrom the past 3 months\b/gi, '')
-        .trim();
-      
-      // Calculate the date from 3 months ago for filtering
-      const threeMonthsAgo = new Date();
-      threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
-      const threeMonthsAgoStr = threeMonthsAgo.toISOString().split('T')[0]; // Format as YYYY-MM-DD
       
       console.log(`Cleaned search query for OpenAI web search: "${searchQuery}"`);
       
-      // Use OpenAI's web search capability with recency parameters
+      // Use OpenAI's web search capability
       const completion = await openai.chat.completions.create({
         model: "gpt-4o-search-preview", // Use the web search model
         web_search_options: {
-          search_context_size: "medium", // Balance between quality and speed
-          // Add user location for better results
-          user_location: {
-            type: "approximate",
-            approximate: {
-              country: "US",
-              city: "San Francisco",
-              region: "California"
-            }
-          }
+          search_context_size: "medium" // Balance between quality and speed
         },
         messages: [
           {
             role: "system",
-            content: `You are a helpful assistant that searches the web for information. 
-            IMPORTANT: Only return results from the past 3 months (after ${threeMonthsAgoStr}).
-            If you find older content, explicitly state that it's not recent enough and prioritize newer content.
-            For each result, try to identify when it was published and include that information.`
+            content: `You are a helpful assistant that searches the web for information related to ${searchQuery}. 
+            Provide comprehensive and accurate information from reputable sources.
+            For each source, include the title, a brief description of the content, and the URL.`
           },
           {
             role: "user",
-            content: `Search for the most recent information about: ${searchQuery}
+            content: `Search for information about: ${searchQuery}
             
-            Focus ONLY on content published in the last 3 months (after ${threeMonthsAgoStr}).
-            Older content should be excluded or clearly marked as not meeting the recency requirement.`
+            Please provide:
+            1. A summary of the most relevant information
+            2. Links to the sources you used
+            3. Brief explanations of why each source is relevant`
           }
         ]
       });
@@ -137,84 +116,15 @@ const searchService = {
             // Validate the URL
             const urlValidation = await validateUrl(url);
             if (urlValidation.isValid) {
-              // Try to extract a date from the content
-              let extractedDate = null;
+              // Generate a current date
+              const now = new Date();
               
-              // Look for date patterns in the content
-              const datePatterns = [
-                // Format: Month Day, Year (e.g., "March 15, 2024")
-                /\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2}),?\s+(20\d{2})\b/i,
-                // Format: Day Month Year (e.g., "15 March 2024")
-                /\b(\d{1,2})\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+(20\d{2})\b/i,
-                // Format: Year-Month-Day (e.g., "2024-03-15")
-                /\b(20\d{2})[-\/](0?[1-9]|1[0-2])[-\/](0?[1-9]|[12][0-9]|3[01])\b/,
-                // Format: "Published on" or "Posted on" followed by date
-                /\b(?:published|posted|updated)(?:\s+on)?\s+(\w+\s+\d{1,2},?\s+20\d{2})\b/i
-              ];
-              
-              for (const pattern of datePatterns) {
-                const match = citedContent.match(pattern);
-                if (match) {
-                  try {
-                    // Different parsing based on pattern type
-                    if (pattern.toString().includes('published|posted|updated')) {
-                      extractedDate = new Date(match[1]);
-                    } else if (pattern.toString().includes('Year-Month-Day')) {
-                      extractedDate = new Date(match[0]);
-                    } else if (pattern.toString().includes('Month Day, Year')) {
-                      extractedDate = new Date(`${match[1]} ${match[2]}, ${match[3]}`);
-                    } else if (pattern.toString().includes('Day Month Year')) {
-                      extractedDate = new Date(`${match[2]} ${match[1]}, ${match[3]}`);
-                    }
-                    
-                    // Check if date is valid and within the last 3 months
-                    if (extractedDate && !isNaN(extractedDate.getTime())) {
-                      const threeMonthsAgo = new Date();
-                      threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
-                      
-                      if (extractedDate < threeMonthsAgo) {
-                        console.log(`Skipping result with date older than 3 months: ${extractedDate.toISOString().split('T')[0]}`);
-                        extractedDate = null; // Mark as invalid date
-                        break;
-                      }
-                      break; // Found a valid date, stop checking patterns
-                    }
-                  } catch (dateError) {
-                    console.log(`Error parsing date: ${dateError.message}`);
-                    extractedDate = null;
-                  }
-                }
-              }
-              
-              // Check if content appears to be older than 3 months
-              const olderContentIndicators = [
-                /published\s+in\s+(january|february|march|april|may|june|july|august|september|october|november|december)\s+20(19|20|21|22)/i,
-                /copyright\s+20(19|20|21|22)/i,
-                /last\s+updated\s+in\s+20(19|20|21|22)/i
-              ];
-              
-              const isLikelyOld = olderContentIndicators.some(pattern => pattern.test(citedContent));
-              
-              if (isLikelyOld && !extractedDate) {
-                console.log(`Skipping likely old content without a valid date: ${url}`);
-              } else {
-                // If no valid date was extracted, generate a recent one
-                if (!extractedDate) {
-                  const now = new Date();
-                  const threeMonthsAgo = new Date();
-                  threeMonthsAgo.setMonth(now.getMonth() - 3);
-                  extractedDate = new Date(
-                    threeMonthsAgo.getTime() + Math.random() * (now.getTime() - threeMonthsAgo.getTime())
-                  );
-                }
-                
-                results.push({
-                  title: title || 'No title',
-                  description: citedContent || 'No description available',
-                  source: url,
-                  date: extractedDate.toISOString().split('T')[0] // Format as YYYY-MM-DD
-                });
-              }
+              results.push({
+                title: title || 'No title',
+                description: citedContent || 'No description available',
+                source: url,
+                date: now.toISOString().split('T')[0] // Format as YYYY-MM-DD
+              });
             } else {
               console.log(`Skipping invalid URL ${url}: ${urlValidation.reason}`);
             }

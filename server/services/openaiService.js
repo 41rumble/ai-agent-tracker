@@ -170,21 +170,18 @@ const openaiService = {
         messages: [
           {
             role: "system",
-            content: `You are an AI assistant that generates search queries to find the latest advancements in ${project.domain} related to specific project goals and interests. 
-            Your queries should be focused on finding the most recent and relevant information.`
+            content: `You are an AI assistant that generates search queries to find the latest advancements in ${project.domain} related to specific project goals and interests.`
           },
           {
             role: "user",
-            content: `Generate 5 search queries to find the MOST RECENT advancements in ${project.domain} related to the project goals: ${project.goals.join(', ')} and interests: ${project.interests.join(', ')}.
+            content: `Generate 5 search queries to find relevant information about ${project.domain} related to the project goals: ${project.goals.join(', ')} and interests: ${project.interests.join(', ')}.
             
             IMPORTANT GUIDELINES:
-            1. DO NOT include specific dates, months, or years in the queries
-            2. DO use general terms like "recent", "latest", "new", "current", etc.
-            3. Focus on the core topics and technologies relevant to the project
-            4. Make queries specific enough to find relevant content but general enough to get good results
-            5. Avoid overly complex queries with too many terms
-            
-            The search system will automatically filter for recent content, so you don't need to specify date ranges.`
+            1. Keep queries simple and focused on the core topics
+            2. Use terms like "recent" or "latest" to encourage newer results
+            3. Focus on the specific technologies and concepts relevant to the project
+            4. Make each query distinct to cover different aspects of the project
+            5. Avoid overly complex queries with too many terms`
           }
         ]
       });
@@ -194,27 +191,9 @@ const openaiService = {
         .filter(line => line.trim().length > 0)
         .map(line => line.replace(/^\d+\.\s*/, '').trim());
       
-      // Clean up queries to remove any specific dates that might have been included
-      const cleanedQueries = queries.map(query => {
-        // Remove specific month/year patterns
-        let cleaned = query.replace(/\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}\b/gi, 'recent');
-        
-        // Remove year-only patterns
-        cleaned = cleaned.replace(/\b(20\d{2})\b/g, 'recent');
-        
-        // Add "recent" if no time reference exists
-        const hasTimeReference = /recent|latest|new|current|today|this (week|month|year)|past|last/i.test(cleaned);
-        
-        if (!hasTimeReference) {
-          cleaned = `${cleaned} recent`;
-        }
-        
-        return cleaned;
-      });
+      console.log('Generated search queries:', queries);
       
-      console.log('Generated search queries:', cleanedQueries);
-      
-      return cleanedQueries;
+      return queries;
     } catch (error) {
       console.error('Query generation error:', error);
       throw new Error('Failed to generate search queries');
