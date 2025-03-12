@@ -73,10 +73,14 @@ const assistantsService = {
           project.assistantId,
           {
             name: `${project.name} Assistant`,
-            instructions: `You are an AI assistant that helps track advancements in ${project.domain} related to the project goals: ${project.goals.join(', ')}. 
+            instructions: `You are an AI assistant that helps find information about ${project.domain} related to the project goals: ${project.goals.join(', ')}. 
             The project is interested in: ${project.interests.join(', ')}.
-            Your job is to search for and analyze recent developments, tools, and research in this field.
-            Focus on content from the past 3 months to ensure the information is current.
+            Your job is to search for and analyze developments, tools, and research in this field.
+            
+            IMPORTANT: When using search functions, DO NOT include any dates, years, or time references in your search queries.
+            DO NOT use terms like "recent", "latest", "new", etc. in your search queries.
+            Focus on the core topics and technologies without time references.
+            
             Provide concise summaries and explain why each finding is relevant to the project.`,
             model: "gpt-4o",
             tools: [
@@ -108,10 +112,14 @@ const assistantsService = {
         
         const assistant = await openai.beta.assistants.create({
           name: `${project.name} Assistant`,
-          instructions: `You are an AI assistant that helps track advancements in ${project.domain} related to the project goals: ${project.goals.join(', ')}. 
+          instructions: `You are an AI assistant that helps find information about ${project.domain} related to the project goals: ${project.goals.join(', ')}. 
           The project is interested in: ${project.interests.join(', ')}.
-          Your job is to search for and analyze recent developments, tools, and research in this field.
-          Focus on content from the past 3 months to ensure the information is current.
+          Your job is to search for and analyze developments, tools, and research in this field.
+          
+          IMPORTANT: When using search functions, DO NOT include any dates, years, or time references in your search queries.
+          DO NOT use terms like "recent", "latest", "new", etc. in your search queries.
+          Focus on the core topics and technologies without time references.
+          
           Provide concise summaries and explain why each finding is relevant to the project.`,
           model: "gpt-4o",
           tools: [
@@ -237,9 +245,26 @@ const assistantsService = {
               try {
                 // Parse the function arguments
                 const args = JSON.parse(toolCall.function.arguments);
-                const query = args.query;
+                let query = args.query;
                 
-                console.log(`Assistant is requesting web search for: "${query}"`);
+                // Clean the query to remove any date or time references
+                // Remove years (2020-2029)
+                query = query.replace(/\b20(2\d|1\d)\b/g, '');
+                
+                // Remove month names
+                query = query.replace(/\b(January|February|March|April|May|June|July|August|September|October|November|December)\b/gi, '');
+                
+                // Remove time reference words
+                query = query.replace(/\b(recent|latest|new|current|today|upcoming|modern|emerging|this year|past|last)\b/gi, '');
+                
+                // Remove "in the past X" phrases
+                query = query.replace(/\bin the past\s+\w+\b/gi, '');
+                
+                // Clean up any double spaces and trim
+                query = query.replace(/\s+/g, ' ').trim();
+                
+                console.log(`Assistant requested search for: "${args.query}"`);
+                console.log(`Cleaned search query: "${query}"`);
                 
                 // Perform a web search using the OpenAI chat completions API
                 const completion = await openai.chat.completions.create({
@@ -251,7 +276,7 @@ const assistantsService = {
                     },
                     {
                       role: "user",
-                      content: `Search the web for: ${query}\n\nFocus on recent content from the past 3 months.`
+                      content: `Search the web for: ${query}`
                     }
                   ]
                 });
@@ -339,30 +364,35 @@ const assistantsService = {
       // Add the search query as a message
       await assistantsService.addMessageToThread(
         thread.id, 
-        `Search for recent advancements in ${project.domain} related to: ${query}. 
+        `Search for information about ${project.domain} related to: ${query}. 
         
-        Please focus on content from the past 3 months and use your search_web function to find the most relevant information.
+        Use your search_web function to find relevant information.
+        
+        IMPORTANT: When using the search_web function, DO NOT include any dates, years, or time references in your search queries.
         
         Specifically look for:
-        1. Recent developments in ${project.domain}
-        2. New tools, techniques, or research related to ${project.interests.join(', ')}
-        3. Industry trends and emerging technologies
+        1. Information about ${project.domain}
+        2. Tools, techniques, or research related to ${project.interests.join(', ')}
+        3. Industry trends and technologies
         
         For each result, please provide:
         - A clear title
         - A concise description
         - The source URL
         - Why it's relevant to this project
-        - A categorization (Article, Tool, Research, etc.)
-        
-        Please ensure all sources are from reputable websites and are recent (within the past 3 months).`
+        - A categorization (Article, Tool, Research, etc.)`
       );
       
       // Run the assistant
       const run = await assistantsService.runAssistant(
         thread.id,
         assistant.id,
-        `Focus on finding the most recent and relevant information from the past 3 months. 
+        `IMPORTANT INSTRUCTIONS:
+        
+        1. When using the search_web function, DO NOT include any dates, years, or time references in your search queries.
+        2. DO NOT use terms like "recent", "latest", "new", etc. in your search queries.
+        3. Focus on the core topics and technologies without time references.
+        
         For each result, provide:
         1. A clear title
         2. A concise description
