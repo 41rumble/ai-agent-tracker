@@ -621,15 +621,29 @@ const searchService = {
   
   generateProjectSummary: async (project) => {
     try {
-      // Get recent discoveries for this project
-      const discoveries = await Discovery.find({
+      console.log(`Generating summary for project ${project._id} using existing discoveries (no new search)`);
+      
+      // Get recent discoveries for this project (both presented and not presented)
+      // First try to get unpresented discoveries
+      let discoveries = await Discovery.find({
         projectId: project._id,
         presented: false
       }).sort({ relevanceScore: -1 }).limit(10);
       
+      // If no unpresented discoveries, get the most recent ones regardless of presented status
       if (discoveries.length === 0) {
+        console.log(`No unpresented discoveries found, using most recent discoveries`);
+        discoveries = await Discovery.find({
+          projectId: project._id
+        }).sort({ discoveredAt: -1 }).limit(10);
+      }
+      
+      if (discoveries.length === 0) {
+        console.log(`No discoveries found for project ${project._id}`);
         return null;
       }
+      
+      console.log(`Found ${discoveries.length} discoveries to summarize`);
       
       // Generate summary using OpenAI
       const completion = await openai.chat.completions.create({
@@ -637,11 +651,11 @@ const searchService = {
         messages: [
           {
             role: "system",
-            content: `You are an AI assistant that summarizes recent discoveries related to a project in ${project.domain}.`
+            content: `You are an AI assistant that summarizes discoveries related to a project in ${project.domain}.`
           },
           {
             role: "user",
-            content: `Generate a summary of these recent discoveries for a project with the following goals: ${project.goals.join(', ')} and interests: ${project.interests.join(', ')}.
+            content: `Generate a summary of these discoveries for a project with the following goals: ${project.goals.join(', ')} and interests: ${project.interests.join(', ')}.
             
             Discoveries:
             ${discoveries.map(d => `- ${d.title}: ${d.description} (Relevance: ${d.relevanceScore}/10)`).join('\n')}
@@ -658,6 +672,8 @@ const searchService = {
         { _id: { $in: discoveries.map(d => d._id) } },
         { presented: true }
       );
+      
+      console.log(`Generated summary and marked ${discoveries.length} discoveries as presented`);
       
       return {
         summary,
