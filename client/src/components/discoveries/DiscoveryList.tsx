@@ -104,7 +104,16 @@ const DiscoveryList: React.FC<DiscoveryListProps> = ({ projectId }) => {
     try {
       setLoading(true);
       const response = await apiService.getDiscoveries(projectId);
-      setDiscoveries(response.data);
+      
+      // Handle the new response format which might include discoveries in a nested property
+      if (response.data && response.data.discoveries) {
+        // New format
+        setDiscoveries(response.data.discoveries);
+      } else {
+        // Old format
+        setDiscoveries(response.data || []);
+      }
+      
       setError('');
     } catch (err: any) {
       setError('Failed to load discoveries. Please try again.');
@@ -173,17 +182,21 @@ const DiscoveryList: React.FC<DiscoveryListProps> = ({ projectId }) => {
   const discoveryTypes = ['All', 'Article', 'Discussion', 'News', 'Research', 'Tool', 'Other'];
   
   // Filter discoveries by type and search term
-  const filteredDiscoveries = discoveries.filter(discovery => {
+  const filteredDiscoveries = Array.isArray(discoveries) ? discoveries.filter(discovery => {
+    if (!discovery) return false;
+    
     const matchesSearch = 
-      discovery.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      discovery.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      discovery.categories.some(category => category.toLowerCase().includes(searchTerm.toLowerCase()));
+      (discovery.title || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (discovery.description || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (Array.isArray(discovery.categories) && discovery.categories.some(category => 
+        category && category.toLowerCase().includes(searchTerm.toLowerCase())
+      ));
     
     // If "All" tab is selected or the discovery type matches the selected tab
     const matchesType = tabValue === 0 || discovery.type === discoveryTypes[tabValue];
     
     return matchesSearch && matchesType;
-  });
+  }) : [];
   
   // Get paginated discoveries for the current tab
   const paginatedDiscoveries = filteredDiscoveries.slice(
@@ -193,12 +206,16 @@ const DiscoveryList: React.FC<DiscoveryListProps> = ({ projectId }) => {
   
   // Group discoveries by type for the "All" tab
   const groupedDiscoveries = discoveryTypes.slice(1).map(type => {
-    const typeDiscoveries = discoveries.filter(d => 
-      d.type === type && 
-      (d.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
-       d.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-       d.categories.some(category => category.toLowerCase().includes(searchTerm.toLowerCase())))
-    );
+    const typeDiscoveries = Array.isArray(discoveries) ? discoveries.filter(d => {
+      if (!d) return false;
+      
+      return d.type === type && 
+        ((d.title || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+         (d.description || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+         (Array.isArray(d.categories) && d.categories.some(category => 
+           category && category.toLowerCase().includes(searchTerm.toLowerCase())
+         )));
+    }) : [];
     
     return {
       type,
@@ -325,13 +342,13 @@ const DiscoveryList: React.FC<DiscoveryListProps> = ({ projectId }) => {
                                 </Box>
                                 
                                 <Typography variant="body2" color="text.secondary" paragraph>
-                                  {discovery.description.length > 150 
+                                  {discovery.description && discovery.description.length > 150 
                                     ? `${discovery.description.substring(0, 150)}...` 
-                                    : discovery.description}
+                                    : discovery.description || 'No description available'}
                                 </Typography>
                                 
                                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1 }}>
-                                  {discovery.categories.slice(0, 2).map((category, index) => (
+                                  {Array.isArray(discovery.categories) && discovery.categories.slice(0, 2).map((category, index) => (
                                     <Chip key={index} label={category} size="small" />
                                   ))}
                                 </Box>
@@ -394,11 +411,11 @@ const DiscoveryList: React.FC<DiscoveryListProps> = ({ projectId }) => {
                             </Box>
                             
                             <Typography variant="body2" color="text.secondary" paragraph>
-                              {discovery.description}
+                              {discovery.description || 'No description available'}
                             </Typography>
                             
                             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1 }}>
-                              {discovery.categories.map((category, index) => (
+                              {Array.isArray(discovery.categories) && discovery.categories.map((category, index) => (
                                 <Chip key={index} label={category} size="small" />
                               ))}
                             </Box>
