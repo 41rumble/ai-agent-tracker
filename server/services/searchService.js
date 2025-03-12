@@ -208,7 +208,13 @@ const searchService = {
                 Source: ${result.source}
                 
                 Provide a relevance score from 0-10 (where 10 is extremely relevant) and categorize this result.
-                Format your response as JSON: {"relevanceScore": number, "categories": ["category1", "category2"]}`
+                Also classify this result into one of these types: Article, Discussion, News, Research, Tool, or Other.
+                
+                Format your response as JSON: {
+                  "relevanceScore": number, 
+                  "categories": ["category1", "category2"],
+                  "type": "Article|Discussion|News|Research|Tool|Other"
+                }`
               }
             ]
           });
@@ -219,7 +225,8 @@ const searchService = {
           processedResults.push({
             ...result,
             relevanceScore: evaluation.relevanceScore,
-            categories: evaluation.categories
+            categories: evaluation.categories,
+            type: evaluation.type || 'Article'
           });
         } catch (evaluationError) {
           console.error('Result evaluation error:', evaluationError);
@@ -227,7 +234,8 @@ const searchService = {
           processedResults.push({
             ...result,
             relevanceScore: 5,
-            categories: []
+            categories: [],
+            type: 'Other'
           });
         }
       }
@@ -277,6 +285,11 @@ const searchService = {
           existingDiscovery.relevanceScore = result.relevanceScore;
           existingDiscovery.categories = result.categories;
           
+          // Update type if available
+          if (result.type) {
+            existingDiscovery.type = result.type;
+          }
+          
           // Update publication date if available
           if (publicationDate) {
             existingDiscovery.publicationDate = publicationDate;
@@ -295,6 +308,7 @@ const searchService = {
         source: result.source,
         relevanceScore: result.relevanceScore,
         categories: result.categories,
+        type: result.type || 'Article',
         publicationDate: publicationDate,
         discoveredAt: new Date()
       });

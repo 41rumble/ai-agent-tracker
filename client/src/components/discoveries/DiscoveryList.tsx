@@ -19,7 +19,9 @@ import {
   DialogContent,
   DialogTitle,
   Rating,
-  Divider
+  Divider,
+  Tabs,
+  Tab
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -36,6 +38,7 @@ interface Discovery {
   source: string;
   relevanceScore: number;
   categories: string[];
+  type: 'Article' | 'Discussion' | 'News' | 'Research' | 'Tool' | 'Other';
   discoveredAt: string;
   publicationDate?: string;
   userFeedback?: {
@@ -48,6 +51,32 @@ interface DiscoveryListProps {
   projectId: string;
 }
 
+interface TabPanelProps {
+  children?: React.ReactNode;
+  index: number;
+  value: number;
+}
+
+const TabPanel = (props: TabPanelProps) => {
+  const { children, value, index, ...other } = props;
+
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`discovery-tabpanel-${index}`}
+      aria-labelledby={`discovery-tab-${index}`}
+      {...other}
+    >
+      {value === index && (
+        <Box sx={{ pt: 2 }}>
+          {children}
+        </Box>
+      )}
+    </div>
+  );
+};
+
 const DiscoveryList: React.FC<DiscoveryListProps> = ({ projectId }) => {
   const [discoveries, setDiscoveries] = useState<Discovery[]>([]);
   const [loading, setLoading] = useState(true);
@@ -57,6 +86,7 @@ const DiscoveryList: React.FC<DiscoveryListProps> = ({ projectId }) => {
   const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
   const [feedbackNotes, setFeedbackNotes] = useState('');
   const [feedbackUseful, setFeedbackUseful] = useState<boolean | null>(null);
+  const [tabValue, setTabValue] = useState(0);
 
   useEffect(() => {
     fetchDiscoveries();
@@ -112,11 +142,38 @@ const DiscoveryList: React.FC<DiscoveryListProps> = ({ projectId }) => {
     }
   };
 
-  const filteredDiscoveries = discoveries.filter(discovery => 
-    discovery.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    discovery.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    discovery.categories.some(category => category.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+    setTabValue(newValue);
+  };
+
+  // Get unique discovery types
+  const discoveryTypes = ['All', 'Article', 'Discussion', 'News', 'Research', 'Tool', 'Other'];
+  
+  // Filter discoveries by type and search term
+  const filteredDiscoveries = discoveries.filter(discovery => {
+    const matchesSearch = 
+      discovery.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      discovery.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      discovery.categories.some(category => category.toLowerCase().includes(searchTerm.toLowerCase()));
+    
+    // If "All" tab is selected or the discovery type matches the selected tab
+    const matchesType = tabValue === 0 || discovery.type === discoveryTypes[tabValue];
+    
+    return matchesSearch && matchesType;
+  });
+  
+  // Group discoveries by type for the "All" tab
+  const groupedDiscoveries = discoveryTypes.slice(1).map(type => {
+    return {
+      type,
+      items: discoveries.filter(d => 
+        d.type === type && 
+        (d.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
+         d.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+         d.categories.some(category => category.toLowerCase().includes(searchTerm.toLowerCase())))
+      ).slice(0, 3) // Only show top 3 for each type in the "All" view
+    };
+  }).filter(group => group.items.length > 0);
 
   if (loading) {
     return (
@@ -149,6 +206,19 @@ const DiscoveryList: React.FC<DiscoveryListProps> = ({ projectId }) => {
           />
         </Box>
         
+        <Tabs 
+          value={tabValue} 
+          onChange={handleTabChange} 
+          variant="scrollable"
+          scrollButtons="auto"
+          aria-label="discovery type tabs"
+          sx={{ mb: 2 }}
+        >
+          {discoveryTypes.map((type, index) => (
+            <Tab key={type} label={type} id={`discovery-tab-${index}`} aria-controls={`discovery-tabpanel-${index}`} />
+          ))}
+        </Tabs>
+        
         {error && (
           <Alert severity="error" sx={{ mb: 3 }}>
             {error}
@@ -159,103 +229,197 @@ const DiscoveryList: React.FC<DiscoveryListProps> = ({ projectId }) => {
           <Alert severity="info">
             No discoveries found yet. Try triggering a search to find relevant tools and resources.
           </Alert>
-        ) : filteredDiscoveries.length === 0 ? (
-          <Alert severity="info">
-            No discoveries match your search criteria.
-          </Alert>
         ) : (
-          <Grid container spacing={3}>
-            {filteredDiscoveries.map((discovery) => (
-              <Grid item xs={12} md={6} key={discovery._id}>
-                <Card variant="outlined">
-                  <CardContent>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <Typography variant="h6" component="h2" gutterBottom>
-                        {discovery.title}
-                      </Typography>
-                      <Rating 
-                        value={discovery.relevanceScore / 2} 
-                        precision={0.5} 
-                        readOnly 
-                        max={5}
-                      />
-                    </Box>
-                    
-                    <Typography variant="body2" color="text.secondary" paragraph>
-                      {discovery.description}
-                    </Typography>
-                    
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1 }}>
-                      {discovery.categories.map((category, index) => (
-                        <Chip key={index} label={category} size="small" />
-                      ))}
-                    </Box>
-                    
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Typography variant="caption" color="text.secondary" display="block">
-                        Discovered: {new Date(discovery.discoveredAt).toLocaleDateString()}
-                      </Typography>
-                      
-                      {discovery.publicationDate && (
-                        <Chip 
-                          label={`Published: ${new Date(discovery.publicationDate).toLocaleDateString()}`}
-                          size="small"
-                          color="primary"
-                          variant="outlined"
-                          sx={{ fontSize: '0.7rem' }}
-                        />
-                      )}
-                    </Box>
-                    
-                    {discovery.userFeedback?.useful !== undefined && (
-                      <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Typography variant="caption" color="text.secondary">
-                          Your feedback:
+          <>
+            {/* All Tab */}
+            <TabPanel value={tabValue} index={0}>
+              {groupedDiscoveries.length === 0 ? (
+                <Alert severity="info">
+                  No discoveries match your search criteria.
+                </Alert>
+              ) : (
+                <>
+                  {groupedDiscoveries.map((group) => (
+                    <Box key={group.type} sx={{ mb: 4 }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                        <Typography variant="h6" component="h2">
+                          {group.type}
                         </Typography>
-                        {discovery.userFeedback.useful ? (
-                          <Chip 
-                            icon={<ThumbUpIcon fontSize="small" />} 
-                            label="Useful" 
+                        {group.items.length > 3 && (
+                          <Button 
                             size="small" 
-                            color="success" 
-                            variant="outlined" 
-                          />
-                        ) : (
-                          <Chip 
-                            icon={<ThumbDownIcon fontSize="small" />} 
-                            label="Not Useful" 
-                            size="small" 
-                            color="error" 
-                            variant="outlined" 
-                          />
+                            onClick={() => setTabValue(discoveryTypes.indexOf(group.type))}
+                          >
+                            View All ({discoveries.filter(d => d.type === group.type).length})
+                          </Button>
                         )}
                       </Box>
-                    )}
-                  </CardContent>
-                  
-                  <Divider />
-                  
-                  <CardActions>
-                    <Button 
-                      size="small" 
-                      startIcon={<OpenInNewIcon />}
-                      href={discovery.source}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      View Source
-                    </Button>
-                    <Button 
-                      size="small"
-                      onClick={() => handleFeedbackClick(discovery)}
-                    >
-                      {discovery.userFeedback?.useful !== undefined ? 'Edit Feedback' : 'Add Feedback'}
-                    </Button>
-                  </CardActions>
-                </Card>
-              </Grid>
+                      <Grid container spacing={3}>
+                        {group.items.map((discovery) => (
+                          <Grid item xs={12} md={4} key={discovery._id}>
+                            <Card variant="outlined">
+                              <CardContent>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                  <Typography variant="h6" component="h2" gutterBottom>
+                                    {discovery.title}
+                                  </Typography>
+                                </Box>
+                                
+                                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                                  <Rating
+                                    value={discovery.relevanceScore / 2}
+                                    precision={0.5}
+                                    readOnly
+                                    size="small"
+                                    max={5}
+                                  />
+                                </Box>
+                                
+                                <Typography variant="body2" color="text.secondary" paragraph>
+                                  {discovery.description.length > 150 
+                                    ? `${discovery.description.substring(0, 150)}...` 
+                                    : discovery.description}
+                                </Typography>
+                                
+                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1 }}>
+                                  {discovery.categories.slice(0, 2).map((category, index) => (
+                                    <Chip key={index} label={category} size="small" />
+                                  ))}
+                                </Box>
+                                
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <Typography variant="caption" color="text.secondary" display="block">
+                                    {new Date(discovery.discoveredAt).toLocaleDateString()}
+                                  </Typography>
+                                </Box>
+                              </CardContent>
+                              <CardActions>
+                                <Button 
+                                  size="small" 
+                                  onClick={() => window.open(discovery.source, '_blank')}
+                                  endIcon={<OpenInNewIcon />}
+                                >
+                                  View Source
+                                </Button>
+                                <Button 
+                                  size="small" 
+                                  onClick={() => handleOpenFeedbackDialog(discovery)}
+                                >
+                                  Provide Feedback
+                                </Button>
+                              </CardActions>
+                            </Card>
+                          </Grid>
+                        ))}
+                      </Grid>
+                    </Box>
+                  ))}
+                </>
+              )}
+            </TabPanel>
+            
+            {/* Type-specific tabs */}
+            {discoveryTypes.slice(1).map((type, index) => (
+              <TabPanel key={type} value={tabValue} index={index + 1}>
+                {filteredDiscoveries.length === 0 ? (
+                  <Alert severity="info">
+                    No {type.toLowerCase()} discoveries match your search criteria.
+                  </Alert>
+                ) : (
+                  <Grid container spacing={3}>
+                    {filteredDiscoveries.map((discovery) => (
+                      <Grid item xs={12} md={6} key={discovery._id}>
+                        <Card variant="outlined">
+                          <CardContent>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                              <Typography variant="h6" component="h2" gutterBottom>
+                                {discovery.title}
+                              </Typography>
+                              <Rating 
+                                value={discovery.relevanceScore / 2} 
+                                precision={0.5} 
+                                readOnly 
+                                max={5}
+                              />
+                            </Box>
+                            
+                            <Typography variant="body2" color="text.secondary" paragraph>
+                              {discovery.description}
+                            </Typography>
+                            
+                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1 }}>
+                              {discovery.categories.map((category, index) => (
+                                <Chip key={index} label={category} size="small" />
+                              ))}
+                            </Box>
+                            
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <Typography variant="caption" color="text.secondary" display="block">
+                                Discovered: {new Date(discovery.discoveredAt).toLocaleDateString()}
+                              </Typography>
+                              
+                              {discovery.publicationDate && (
+                                <Chip 
+                                  label={`Published: ${new Date(discovery.publicationDate).toLocaleDateString()}`}
+                                  size="small"
+                                  color="primary"
+                                  variant="outlined"
+                                  sx={{ fontSize: '0.7rem' }}
+                                />
+                              )}
+                            </Box>
+                            
+                            {discovery.userFeedback?.useful !== undefined && (
+                              <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <Typography variant="caption" color="text.secondary">
+                                  Your feedback:
+                                </Typography>
+                                {discovery.userFeedback.useful ? (
+                                  <Chip 
+                                    icon={<ThumbUpIcon fontSize="small" />} 
+                                    label="Useful" 
+                                    size="small" 
+                                    color="success" 
+                                    variant="outlined" 
+                                  />
+                                ) : (
+                                  <Chip 
+                                    icon={<ThumbDownIcon fontSize="small" />} 
+                                    label="Not Useful" 
+                                    size="small" 
+                                    color="error" 
+                                    variant="outlined" 
+                                  />
+                                )}
+                              </Box>
+                            )}
+                          </CardContent>
+                          
+                          <CardActions>
+                            <Button 
+                              size="small" 
+                              startIcon={<OpenInNewIcon />}
+                              href={discovery.source}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              View Source
+                            </Button>
+                            <Button 
+                              size="small"
+                              onClick={() => handleFeedbackClick(discovery)}
+                            >
+                              {discovery.userFeedback?.useful !== undefined ? 'Edit Feedback' : 'Add Feedback'}
+                            </Button>
+                          </CardActions>
+                        </Card>
+                      </Grid>
+                    ))}
+                  </Grid>
+                )}
+              </TabPanel>
             ))}
-          </Grid>
+          </>
         )}
       </Paper>
       

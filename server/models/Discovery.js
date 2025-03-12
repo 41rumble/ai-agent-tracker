@@ -28,6 +28,11 @@ const DiscoverySchema = new Schema({
   categories: [{
     type: String
   }],
+  type: {
+    type: String,
+    enum: ['Article', 'Discussion', 'News', 'Research', 'Tool', 'Other'],
+    default: 'Article'
+  },
   discoveredAt: {
     type: Date,
     default: Date.now
