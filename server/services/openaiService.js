@@ -250,9 +250,19 @@ const openaiService = {
       
       // Add special instructions for specific newsletters
       if (context.newsletterName.includes('alphasignal.ai')) {
-        systemPrompt += `\n\nThis is an AlphaSignal newsletter which typically contains AI news and research updates. 
-        Pay special attention to any mentions of AI in VFX, animation, or creative tools. 
-        Be sure to extract any URLs that point to original research papers, articles, or tools.`;
+        systemPrompt += `\n\nThis is an AlphaSignal newsletter which typically contains AI news and research updates organized in sections like "TOP NEWS", "TRENDING SIGNALS", "TOP TUTORIALS", and "HOW TO". 
+        
+        Pay special attention to:
+        1. New AI models, tools, and APIs (like OpenAI's Responses API, Atla AI's Selene, etc.)
+        2. AI development frameworks and SDKs
+        3. AI tools for creative work, coding, and automation
+        4. Tutorials and guides for AI developers
+        
+        The newsletter has a structured format with multiple sections. Each section contains multiple items with titles, descriptions, and often links. Extract ALL of these as separate discoveries.
+        
+        Be sure to extract any URLs that point to original research papers, articles, or tools. If URLs aren't explicitly visible, infer them from the context (e.g., product names, company mentions).
+        
+        For each item in the newsletter, create a separate discovery with a high level of detail.`;
       }
       
       if (context.newsletterName.includes('joinsuperhuman.ai')) {
@@ -292,10 +302,13 @@ const openaiService = {
             
             IMPORTANT INSTRUCTIONS:
             - Extract ALL URLs mentioned in the newsletter that point to relevant content
-            - If multiple discoveries come from the same article/source, create separate entries for each distinct insight
+            - Create separate discovery entries for EACH distinct item in the newsletter (news, tool, tutorial, etc.)
+            - For newsletters with sections like "TOP NEWS", "TRENDING SIGNALS", etc., process each item as a separate discovery
             - For research papers, include the paper title and authors in the description
             - For tools, include information about availability, pricing, or access if mentioned
-            - If the newsletter mentions AI models like Omnihuman-1, make sure to extract those as high-relevance discoveries
+            - For AI models and APIs (like OpenAI's Responses API, Atla AI's Selene, etc.), extract detailed capabilities
+            - Pay special attention to AI development tools, frameworks, and SDKs
+            - Check the EXTRACTED LINKS section at the end of the content for additional URLs to include
             
             Format your response as a JSON object with an array of discoveries. Only include information that is actually relevant to the project.
             

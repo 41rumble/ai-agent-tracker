@@ -205,10 +205,31 @@ async function checkEmailsForUser(userId) {
                   
                   // Prefer HTML content for better URL extraction, but fall back to text
                   let content = '';
+                  let extractedLinks = [];
+                  
                   if (parsed.html) {
                     // Keep HTML content for better URL extraction
                     content = parsed.html;
                     console.log('Using HTML content for better URL extraction');
+                    
+                    // Extract links from HTML content
+                    try {
+                      // Simple regex to extract URLs from href attributes
+                      const linkRegex = /href=["'](https?:\/\/[^"']+)["']/g;
+                      let match;
+                      while ((match = linkRegex.exec(parsed.html)) !== null) {
+                        extractedLinks.push(match[1]);
+                      }
+                      
+                      console.log(`Extracted ${extractedLinks.length} links from HTML content`);
+                      
+                      // Add extracted links to the content for better processing
+                      if (extractedLinks.length > 0) {
+                        content += "\n\nEXTRACTED LINKS:\n" + extractedLinks.join("\n");
+                      }
+                    } catch (err) {
+                      console.error('Error extracting links from HTML:', err);
+                    }
                   } else if (parsed.text) {
                     content = parsed.text;
                     console.log('Using plain text content');
@@ -226,6 +247,23 @@ async function checkEmailsForUser(userId) {
                   
                   // Process the newsletter content
                   try {
+                    // Special handling for Alpha Signal newsletters
+                    if (from.includes('alphasignal.ai')) {
+                      console.log('Detected Alpha Signal newsletter - using specialized processing');
+                      
+                      // Extract sections from Alpha Signal newsletter if possible
+                      try {
+                        const sections = extractAlphaSignalSections(content);
+                        if (sections && Object.keys(sections).length > 0) {
+                          console.log(`Successfully extracted ${Object.keys(sections).length} sections from Alpha Signal newsletter`);
+                          // Add section information to the content
+                          content += "\n\nEXTRACTED SECTIONS:\n" + JSON.stringify(sections, null, 2);
+                        }
+                      } catch (err) {
+                        console.error('Error extracting sections from Alpha Signal newsletter:', err);
+                      }
+                    }
+                    
                     const result = await processNewsletterContent(
                       projectId, 
                       {
@@ -348,9 +386,77 @@ async function runImmediateCheck(userId) {
   }
 }
 
+/**
+ * Extract sections from Alpha Signal newsletter
+ * @param {string} content - The newsletter content
+ * @returns {Object} - Extracted sections
+ */
+function extractAlphaSignalSections(content) {
+  const sections = {};
+  
+  try {
+    // Extract TOP NEWS section
+    const topNewsMatch = content.match(/TOP NEWS([\s\S]*?)(?:TRENDING SIGNALS|$)/i);
+    if (topNewsMatch && topNewsMatch[1]) {
+      sections.topNews = topNewsMatch[1].trim();
+    }
+    
+    // Extract TRENDING SIGNALS section
+    const trendingSignalsMatch = content.match(/TRENDING SIGNALS([\s\S]*?)(?:TOP TUTORIALS|$)/i);
+    if (trendingSignalsMatch && trendingSignalsMatch[1]) {
+      sections.trendingSignals = trendingSignalsMatch[1].trim();
+    }
+    
+    // Extract TOP TUTORIALS section
+    const topTutorialsMatch = content.match(/TOP TUTORIALS([\s\S]*?)(?:HOW TO|$)/i);
+    if (topTutorialsMatch && topTutorialsMatch[1]) {
+      sections.topTutorials = topTutorialsMatch[1].trim();
+    }
+    
+    // Extract HOW TO section
+    const howToMatch = content.match(/HOW TO([\s\S]*?)(?:How was today's email\?|$)/i);
+    if (howToMatch && howToMatch[1]) {
+      sections.howTo = howToMatch[1].trim();
+    }
+    
+    // Try to extract individual items from each section
+    Object.keys(sections).forEach(sectionKey => {
+      const sectionContent = sections[sectionKey];
+      const items = [];
+      
+      // Look for patterns like titles followed by descriptions
+      const itemMatches = sectionContent.match(/([A-Z][^\n]+)\n([^⇧]+)⇧/g);
+      
+      if (itemMatches) {
+        itemMatches.forEach(item => {
+          const titleMatch = item.match(/([A-Z][^\n]+)\n/);
+          const title = titleMatch ? titleMatch[1].trim() : '';
+          
+          const descMatch = item.match(/\n([^⇧]+)⇧/);
+          const description = descMatch ? descMatch[1].trim() : '';
+          
+          if (title && description) {
+            items.push({ title, description });
+          }
+        });
+      }
+      
+      if (items.length > 0) {
+        sections[sectionKey + 'Items'] = items;
+      }
+    });
+    
+    return sections;
+  } catch (error) {
+    console.error('Error extracting Alpha Signal sections:', error);
+    return {};
+  }
+}
+
 module.exports = {
   checkEmailsForUser,
   scheduleEmailChecks,
   runImmediateCheck,
-  processNewsletterContent
+  processNewsletterContent,
+  extractAlphaSignalSections
 };
