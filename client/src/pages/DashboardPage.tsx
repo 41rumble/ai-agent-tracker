@@ -59,18 +59,30 @@ const DashboardPage: React.FC = () => {
       // Fetch recent discoveries for all projects
       if (projectsResponse.data.length > 0) {
         const projectIds = projectsResponse.data.map((project: Project) => project._id);
-        const recentDiscoveriesPromises = projectIds.map((id: string) => 
+        const recentDiscoveriesPromises = projectIds.map((id: string) =>
           apiService.getDiscoveries(id)
         );
-        
+
         const discoveryResponses = await Promise.all(recentDiscoveriesPromises);
-        const allDiscoveries = discoveryResponses.flatMap(response => response.data);
         
-        // Sort by date and take the 5 most recent
-        const sortedDiscoveries = allDiscoveries.sort((a: Discovery, b: Discovery) => 
-          new Date(b.discoveredAt).getTime() - new Date(a.discoveredAt).getTime()
-        ).slice(0, 5);
+        // Handle the new response format which might include discoveries in a nested property
+        const allDiscoveries = discoveryResponses.flatMap(response => {
+          // Check if the response has a discoveries property (new format)
+          if (response.data && response.data.discoveries) {
+            return response.data.discoveries;
+          }
+          // Otherwise, assume the response data is the discoveries array (old format)
+          return response.data || [];
+        });
         
+        // Filter out any discoveries without a description and sort by date
+        const sortedDiscoveries = allDiscoveries
+          .filter((discovery: any) => discovery && discovery.description) // Filter out any discoveries without a description
+          .sort((a: Discovery, b: Discovery) =>
+            new Date(b.discoveredAt).getTime() - new Date(a.discoveredAt).getTime()
+          )
+          .slice(0, 5);
+
         setRecentDiscoveries(sortedDiscoveries);
       }
       
@@ -190,9 +202,9 @@ const DashboardPage: React.FC = () => {
                         {discovery.title}
                       </Typography>
                       <Typography variant="body2" color="text.secondary" paragraph>
-                        {discovery.description.length > 200 
+                        {discovery.description && discovery.description.length > 200 
                           ? `${discovery.description.substring(0, 200)}...` 
-                          : discovery.description}
+                          : discovery.description || 'No description available'}
                       </Typography>
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <Typography variant="caption" color="text.secondary">
