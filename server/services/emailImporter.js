@@ -264,6 +264,23 @@ async function checkEmailsForUser(userId) {
                       }
                     }
                     
+                    // Special handling for Superhuman newsletters
+                    if (from.includes('joinsuperhuman.ai')) {
+                      console.log('Detected Superhuman newsletter - using specialized processing');
+                      
+                      // Extract sections from Superhuman newsletter if possible
+                      try {
+                        const sections = extractSuperhumanSections(content);
+                        if (sections && Object.keys(sections).length > 0) {
+                          console.log(`Successfully extracted ${Object.keys(sections).length} sections from Superhuman newsletter`);
+                          // Add section information to the content
+                          content += "\n\nEXTRACTED SECTIONS:\n" + JSON.stringify(sections, null, 2);
+                        }
+                      } catch (err) {
+                        console.error('Error extracting sections from Superhuman newsletter:', err);
+                      }
+                    }
+                    
                     const result = await processNewsletterContent(
                       projectId, 
                       {
@@ -453,10 +470,107 @@ function extractAlphaSignalSections(content) {
   }
 }
 
+/**
+ * Extract sections from Superhuman newsletter
+ * @param {string} content - The newsletter content
+ * @returns {Object} - Extracted sections
+ */
+function extractSuperhumanSections(content) {
+  const sections = {};
+  
+  try {
+    // Extract TODAY IN AI section
+    const todayInAiMatch = content.match(/TODAY IN AI([\s\S]*?)(?:FROM THE FRONTIER|PRESENTED BY|$)/i);
+    if (todayInAiMatch && todayInAiMatch[1]) {
+      sections.todayInAi = todayInAiMatch[1].trim();
+    }
+    
+    // Extract FROM THE FRONTIER section
+    const frontierMatch = content.match(/FROM THE FRONTIER([\s\S]*?)(?:THE AI ACADEMY|PRESENTED BY|$)/i);
+    if (frontierMatch && frontierMatch[1]) {
+      sections.frontier = frontierMatch[1].trim();
+    }
+    
+    // Extract AI & TECH NEWS section
+    const techNewsMatch = content.match(/AI & TECH NEWS([\s\S]*?)(?:PRODUCTIVITY|PRESENTED BY|$)/i);
+    if (techNewsMatch && techNewsMatch[1]) {
+      sections.techNews = techNewsMatch[1].trim();
+    }
+    
+    // Extract PRODUCTIVITY section
+    const productivityMatch = content.match(/PRODUCTIVITY([\s\S]*?)(?:PROMPT OF THE DAY|SOCIAL SIGNALS|$)/i);
+    if (productivityMatch && productivityMatch[1]) {
+      sections.productivity = productivityMatch[1].trim();
+    }
+    
+    // Extract SOCIAL SIGNALS section
+    const socialSignalsMatch = content.match(/SOCIAL SIGNALS([\s\S]*?)(?:AI-GENERATED IMAGES|$)/i);
+    if (socialSignalsMatch && socialSignalsMatch[1]) {
+      sections.socialSignals = socialSignalsMatch[1].trim();
+    }
+    
+    // Try to extract individual news items from each section
+    Object.keys(sections).forEach(sectionKey => {
+      const sectionContent = sections[sectionKey];
+      const items = [];
+      
+      // Look for numbered items (e.g., "1. New model can clone...")
+      const numberedItems = sectionContent.match(/\d+\.\s+([^\n]+)[\s\S]*?(?=\d+\.\s+|$)/g);
+      
+      if (numberedItems) {
+        numberedItems.forEach(item => {
+          const titleMatch = item.match(/\d+\.\s+([^\n]+)/);
+          const title = titleMatch ? titleMatch[1].trim() : '';
+          
+          // Get the rest of the content as description
+          const description = item.replace(/\d+\.\s+([^\n]+)/, '').trim();
+          
+          if (title) {
+            items.push({ 
+              title, 
+              description: description || 'No description available' 
+            });
+          }
+        });
+      } else {
+        // Try to extract items with emoji bullets (e.g., "✅ MindPal:")
+        const emojiItems = sectionContent.match(/[✅🦎♟️🤝📊🎮💰✍️🛒🧑‍💻🔮⚙️]\s+([^:]+):[^✅🦎♟️🤝📊🎮💰✍️🛒🧑‍💻🔮⚙️]*/g);
+        
+        if (emojiItems) {
+          emojiItems.forEach(item => {
+            const titleMatch = item.match(/[✅🦎♟️🤝📊🎮💰✍️🛒🧑‍💻🔮⚙️]\s+([^:]+):/);
+            const title = titleMatch ? titleMatch[1].trim() : '';
+            
+            // Get the rest of the content as description
+            const description = item.replace(/[✅🦎♟️🤝📊🎮💰✍️🛒🧑‍💻🔮⚙️]\s+([^:]+):/, '').trim();
+            
+            if (title) {
+              items.push({ 
+                title, 
+                description: description || 'No description available' 
+              });
+            }
+          });
+        }
+      }
+      
+      if (items.length > 0) {
+        sections[sectionKey + 'Items'] = items;
+      }
+    });
+    
+    return sections;
+  } catch (error) {
+    console.error('Error extracting Superhuman sections:', error);
+    return {};
+  }
+}
+
 module.exports = {
   checkEmailsForUser,
   scheduleEmailChecks,
   runImmediateCheck,
   processNewsletterContent,
-  extractAlphaSignalSections
+  extractAlphaSignalSections,
+  extractSuperhumanSections
 };

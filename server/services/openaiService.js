@@ -266,9 +266,20 @@ const openaiService = {
       }
       
       if (context.newsletterName.includes('joinsuperhuman.ai')) {
-        systemPrompt += `\n\nThis is a Superhuman newsletter which often contains curated AI news and developments.
-        Look carefully for any mentions of AI in creative fields, especially visual effects, animation, or digital content creation.
-        Extract all URLs that link to original sources, research papers, or tools mentioned in the newsletter.`;
+        systemPrompt += `\n\nThis is a Superhuman newsletter which contains curated AI news and developments organized in sections like "TODAY IN AI", "FROM THE FRONTIER", "AI & TECH NEWS", "PRODUCTIVITY", and "SOCIAL SIGNALS".
+        
+        Pay special attention to:
+        1. New AI models and their capabilities (like voice cloning models, image generators)
+        2. AI tools for productivity and business applications
+        3. Updates from major AI companies (OpenAI, Anthropic, Meta, etc.)
+        4. AI agents and their applications in various domains
+        5. AI development tools and platforms
+        
+        The newsletter has a structured format with multiple sections. Each section contains multiple news items with titles, descriptions, and often links. Extract ALL of these as separate discoveries.
+        
+        Extract all URLs that link to original sources, research papers, or tools mentioned in the newsletter. If URLs aren't explicitly visible, infer them from the context (e.g., product names, company mentions).
+        
+        For each news item in the newsletter, create a separate discovery with a high level of detail.`;
       }
       
       const completion = await openai.chat.completions.create({
