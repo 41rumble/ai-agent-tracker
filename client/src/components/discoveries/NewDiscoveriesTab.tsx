@@ -107,9 +107,15 @@ const NewDiscoveriesTab: React.FC<NewDiscoveriesTabProps> = ({ projectId }) => {
       setLoading(true);
       setError('');
       
+      console.log('NewDiscoveriesTab - Fetching discoveries with filter:', filter, 'and sort:', sort);
       const response = await apiService.getDiscoveries(projectId, filter, sort);
       
+      console.log('NewDiscoveriesTab - API Response:', response.data);
+      
       if (response.data) {
+        console.log('NewDiscoveriesTab - Discoveries:', response.data.discoveries);
+        console.log('NewDiscoveriesTab - Counts:', response.data.counts);
+        
         setDiscoveries(response.data.discoveries || []);
         setCounts(response.data.counts || {
           total: 0,

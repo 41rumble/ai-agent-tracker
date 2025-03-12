@@ -103,14 +103,19 @@ const DiscoveryList: React.FC<DiscoveryListProps> = ({ projectId }) => {
   const fetchDiscoveries = async () => {
     try {
       setLoading(true);
-      const response = await apiService.getDiscoveries(projectId);
+      // Use 'all' filter to get all discoveries
+      const response = await apiService.getDiscoveries(projectId, 'all', 'relevance');
+      
+      console.log('DiscoveryList - API Response:', response.data);
       
       // Handle the new response format which might include discoveries in a nested property
       if (response.data && response.data.discoveries) {
         // New format
+        console.log('DiscoveryList - Using new format with nested discoveries:', response.data.discoveries);
         setDiscoveries(response.data.discoveries);
       } else {
         // Old format
+        console.log('DiscoveryList - Using old format:', response.data);
         setDiscoveries(response.data || []);
       }
       
