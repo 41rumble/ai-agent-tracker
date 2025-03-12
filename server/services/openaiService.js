@@ -163,31 +163,7 @@ const openaiService = {
 
   generateSearchQueries: async (projectId, project) => {
     try {
-      // Get current date and calculate relative dates for the past 3 months
-      const now = new Date();
-      const currentMonth = now.toLocaleString('default', { month: 'long' });
-      const currentYear = now.getFullYear();
-      
-      // Calculate previous months
-      const oneMonthAgo = new Date();
-      oneMonthAgo.setMonth(now.getMonth() - 1);
-      const oneMonthAgoName = oneMonthAgo.toLocaleString('default', { month: 'long' });
-      const oneMonthAgoYear = oneMonthAgo.getFullYear();
-      
-      const twoMonthsAgo = new Date();
-      twoMonthsAgo.setMonth(now.getMonth() - 2);
-      const twoMonthsAgoName = twoMonthsAgo.toLocaleString('default', { month: 'long' });
-      const twoMonthsAgoYear = twoMonthsAgo.getFullYear();
-      
-      const threeMonthsAgo = new Date();
-      threeMonthsAgo.setMonth(now.getMonth() - 3);
-      const threeMonthsAgoName = threeMonthsAgo.toLocaleString('default', { month: 'long' });
-      const threeMonthsAgoYear = threeMonthsAgo.getFullYear();
-      
-      // Create a date range string for the prompt
-      const dateRangeText = `${threeMonthsAgoName} ${threeMonthsAgoYear} to ${currentMonth} ${currentYear}`;
-      
-      console.log(`Generating search queries for date range: ${dateRangeText}`);
+      console.log(`Generating search queries for project: ${project.name}`);
       
       const completion = await openai.chat.completions.create({
         model: "gpt-4-turbo",
@@ -195,21 +171,20 @@ const openaiService = {
           {
             role: "system",
             content: `You are an AI assistant that generates search queries to find the latest advancements in ${project.domain} related to specific project goals and interests. 
-            Focus on recent content from the past 3 months (${dateRangeText}).`
+            Your queries should be focused on finding the most recent and relevant information.`
           },
           {
             role: "user",
             content: `Generate 5 search queries to find the MOST RECENT advancements in ${project.domain} related to the project goals: ${project.goals.join(', ')} and interests: ${project.interests.join(', ')}.
             
-            IMPORTANT: Use THESE EXACT time references in your queries:
-            - Current month: "${currentMonth} ${currentYear}"
-            - Last month: "${oneMonthAgoName} ${oneMonthAgoYear}"
-            - Two months ago: "${twoMonthsAgoName} ${twoMonthsAgoYear}"
-            - Three months ago: "${threeMonthsAgoName} ${threeMonthsAgoYear}"
-            - Or use general terms like "past 3 months", "recent", "latest", etc.
+            IMPORTANT GUIDELINES:
+            1. DO NOT include specific dates, months, or years in the queries
+            2. DO use general terms like "recent", "latest", "new", "current", etc.
+            3. Focus on the core topics and technologies relevant to the project
+            4. Make queries specific enough to find relevant content but general enough to get good results
+            5. Avoid overly complex queries with too many terms
             
-            DO NOT use specific months from previous years. Only use the months and years provided above.
-            Format each query to specifically target content from the past 3 months.`
+            The search system will automatically filter for recent content, so you don't need to specify date ranges.`
           }
         ]
       });
@@ -219,23 +194,27 @@ const openaiService = {
         .filter(line => line.trim().length > 0)
         .map(line => line.replace(/^\d+\.\s*/, '').trim());
       
-      // Add time constraints to queries that don't already have them
-      const timeConstrainedQueries = queries.map(query => {
-        // Check if query already has a time constraint
-        const hasTimeConstraint = new RegExp(
-          `recent|latest|new|${currentYear}|${oneMonthAgoYear}|${currentMonth}|${oneMonthAgoName}|${twoMonthsAgoName}|this month|last month|past \\d+ (days|weeks|months)`,
-          'i'
-        ).test(query);
+      // Clean up queries to remove any specific dates that might have been included
+      const cleanedQueries = queries.map(query => {
+        // Remove specific month/year patterns
+        let cleaned = query.replace(/\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}\b/gi, 'recent');
         
-        if (!hasTimeConstraint) {
-          return `${query} (past 3 months)`;
+        // Remove year-only patterns
+        cleaned = cleaned.replace(/\b(20\d{2})\b/g, 'recent');
+        
+        // Add "recent" if no time reference exists
+        const hasTimeReference = /recent|latest|new|current|today|this (week|month|year)|past|last/i.test(cleaned);
+        
+        if (!hasTimeReference) {
+          cleaned = `${cleaned} recent`;
         }
-        return query;
+        
+        return cleaned;
       });
       
-      console.log('Generated time-constrained queries:', timeConstrainedQueries);
+      console.log('Generated search queries:', cleanedQueries);
       
-      return timeConstrainedQueries;
+      return cleanedQueries;
     } catch (error) {
       console.error('Query generation error:', error);
       throw new Error('Failed to generate search queries');
