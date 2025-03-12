@@ -2,8 +2,8 @@ const apiConfig = {
   openai: {
     baseUrl: 'https://api.openai.com/v1',
     apiKey: process.env.OPENAI_API_KEY,
-    webSearchEnabled: process.env.ENABLE_OPENAI_WEB_SEARCH === 'true',
-    assistantsEnabled: process.env.ENABLE_OPENAI_ASSISTANTS === 'true'
+    webSearchEnabled: process.env.ENABLE_OPENAI_WEB_SEARCH !== 'false', // Enabled by default
+    assistantsEnabled: process.env.ENABLE_OPENAI_ASSISTANTS !== 'false' // Enabled by default
   },
   googleSearch: {
     apiKey: process.env.GOOGLE_SEARCH_API_KEY || '',

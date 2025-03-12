@@ -168,7 +168,7 @@ const assistantsService = {
   /**
    * Wait for a run to complete
    */
-  waitForRunCompletion: async (threadId, runId, maxAttempts = 60, delayMs = 1000) => {
+  waitForRunCompletion: async (threadId, runId, maxAttempts = 180, delayMs = 2000) => {
     let attempts = 0;
     
     while (attempts < maxAttempts) {
@@ -178,6 +178,80 @@ const assistantsService = {
         return run;
       } else if (run.status === 'failed' || run.status === 'cancelled' || run.status === 'expired') {
         throw new Error(`Run ${runId} ended with status: ${run.status}`);
+      } else if (run.status === 'requires_action') {
+        // Handle function calling
+        if (run.required_action && run.required_action.type === 'submit_tool_outputs') {
+          const toolCalls = run.required_action.submit_tool_outputs.tool_calls;
+          const toolOutputs = [];
+          
+          for (const toolCall of toolCalls) {
+            if (toolCall.function.name === 'search_web') {
+              try {
+                // Parse the function arguments
+                const args = JSON.parse(toolCall.function.arguments);
+                const query = args.query;
+                
+                console.log(`Assistant is requesting web search for: "${query}"`);
+                
+                // Perform a web search using the OpenAI chat completions API
+                const completion = await openai.chat.completions.create({
+                  model: "gpt-4o",
+                  messages: [
+                    {
+                      role: "system",
+                      content: "You are a helpful assistant that provides search results. Return 5-7 relevant results with titles, descriptions, and URLs."
+                    },
+                    {
+                      role: "user",
+                      content: `Search the web for: ${query}\n\nFocus on recent content from the past 3 months.`
+                    }
+                  ]
+                });
+                
+                // Add the tool output
+                toolOutputs.push({
+                  tool_call_id: toolCall.id,
+                  output: JSON.stringify({
+                    results: completion.choices[0].message.content
+                  })
+                });
+              } catch (error) {
+                console.error('Error performing web search for assistant:', error);
+                toolOutputs.push({
+                  tool_call_id: toolCall.id,
+                  output: JSON.stringify({
+                    error: "Failed to perform web search",
+                    message: error.message
+                  })
+                });
+              }
+            }
+          }
+          
+          // Submit the tool outputs
+          if (toolOutputs.length > 0) {
+            try {
+              await openai.beta.threads.runs.submitToolOutputs(
+                threadId,
+                runId,
+                { tool_outputs: toolOutputs }
+              );
+              
+              // Continue waiting for completion
+              await new Promise(resolve => setTimeout(resolve, delayMs));
+              attempts++;
+              continue;
+            } catch (error) {
+              console.error('Error submitting tool outputs:', error);
+              throw new Error(`Failed to submit tool outputs: ${error.message}`);
+            }
+          }
+        }
+      }
+      
+      // Log status periodically
+      if (attempts % 10 === 0) {
+        console.log(`Waiting for run ${runId} to complete. Current status: ${run.status}. Attempt ${attempts}/${maxAttempts}`);
       }
       
       // Wait before checking again
@@ -185,7 +259,7 @@ const assistantsService = {
       attempts++;
     }
     
-    throw new Error(`Run ${runId} did not complete within the expected time`);
+    throw new Error(`Run ${runId} did not complete within the expected time (${maxAttempts * delayMs / 1000} seconds)`);
   },
   
   /**

@@ -58,11 +58,11 @@ OPENAI_API_KEY=your_openai_api_key
 JWT_SECRET=your_jwt_secret
 JWT_EXPIRY=24h
 
-# Optional: Enable OpenAI's web search capability (requires gpt-4o-search-preview access)
-ENABLE_OPENAI_WEB_SEARCH=true
-
-# Optional: Enable OpenAI's Assistants API with web search (recommended)
+# Enable OpenAI's Assistants API with function calling for web search (recommended)
 ENABLE_OPENAI_ASSISTANTS=true
+
+# Enable OpenAI's web search capability as fallback (requires gpt-4o-search-preview access)
+ENABLE_OPENAI_WEB_SEARCH=true
 
 # Optional: Google Search fallback (only used as a last resort if both OpenAI methods fail)
 # GOOGLE_SEARCH_API_KEY=your_google_search_api_key
