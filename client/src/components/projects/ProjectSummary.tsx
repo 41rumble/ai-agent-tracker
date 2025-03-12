@@ -36,38 +36,11 @@ const ProjectSummary: React.FC<ProjectSummaryProps> = ({ projectId }) => {
   const [newDiscoveriesCount, setNewDiscoveriesCount] = useState(0);
   const [summaryAge, setSummaryAge] = useState<number>(0); // Age in hours
 
-  useEffect(() => {
-    // Check if we have a summary in localStorage
-    const storedSummary = localStorage.getItem(`project_summary_${projectId}`);
-    
-    if (storedSummary) {
-      try {
-        const parsedSummary = JSON.parse(storedSummary);
-        setSummary(parsedSummary.summary);
-        setDiscoveries(parsedSummary.discoveries || []);
-        setLastUpdated(new Date(parsedSummary.lastUpdated));
-        
-        // Calculate summary age
-        const now = new Date();
-        const lastUpdatedDate = new Date(parsedSummary.lastUpdated);
-        const hoursSinceUpdate = Math.floor((now.getTime() - lastUpdatedDate.getTime()) / (1000 * 60 * 60));
-        setSummaryAge(hoursSinceUpdate);
-        
-        // We still have loading state to true to check for new discoveries
-        checkForNewDiscoveries();
-      } catch (error) {
-        console.error('Error parsing stored summary:', error);
-        fetchSummary(); // Fallback to fetching from API
-      }
-    } else {
-      // No stored summary, fetch from API
-      fetchSummary();
-    }
-  }, [projectId]);
-
   // Function to check for new discoveries
   const checkForNewDiscoveries = async () => {
     try {
+      console.log('ProjectSummary - Checking for new discoveries');
+      
       // Get the latest discoveries
       const response = await apiService.getDiscoveries(projectId);
       
@@ -79,12 +52,15 @@ const ProjectSummary: React.FC<ProjectSummaryProps> = ({ projectId }) => {
         latestDiscoveries = response.data || [];
       }
       
+      console.log('ProjectSummary - Found', latestDiscoveries.length, 'discoveries');
+      
       // If we have a last updated timestamp, count discoveries newer than that
       if (lastUpdated && latestDiscoveries.length > 0) {
         const newCount = latestDiscoveries.filter(
           (d: any) => new Date(d.discoveredAt) > lastUpdated
         ).length;
         
+        console.log('ProjectSummary - Found', newCount, 'new discoveries since', lastUpdated);
         setNewDiscoveriesCount(newCount);
       }
       
@@ -96,21 +72,63 @@ const ProjectSummary: React.FC<ProjectSummaryProps> = ({ projectId }) => {
     }
   };
 
+  // Initial load effect
+  useEffect(() => {
+    console.log('ProjectSummary - Initial load for project:', projectId);
+    setLoading(true);
+    
+    // Check if we have a summary in localStorage
+    const storedSummary = localStorage.getItem(`project_summary_${projectId}`);
+    console.log('ProjectSummary - Stored summary found:', !!storedSummary);
+    
+    if (storedSummary) {
+      try {
+        const parsedSummary = JSON.parse(storedSummary);
+        console.log('ProjectSummary - Using stored summary from:', parsedSummary.lastUpdated);
+        
+        setSummary(parsedSummary.summary);
+        setDiscoveries(parsedSummary.discoveries || []);
+        setLastUpdated(new Date(parsedSummary.lastUpdated));
+        
+        // Calculate summary age
+        const now = new Date();
+        const lastUpdatedDate = new Date(parsedSummary.lastUpdated);
+        const hoursSinceUpdate = Math.floor((now.getTime() - lastUpdatedDate.getTime()) / (1000 * 60 * 60));
+        setSummaryAge(hoursSinceUpdate);
+        
+        // Check for new discoveries but don't regenerate summary
+        checkForNewDiscoveries();
+      } catch (error) {
+        console.error('Error parsing stored summary:', error);
+        // Fallback to fetching from API only if parsing fails
+        fetchSummary();
+      }
+    } else {
+      console.log('ProjectSummary - No stored summary, fetching from API');
+      // No stored summary, fetch from API
+      fetchSummary();
+    }
+  }, [projectId]);
+
   // Check for new discoveries periodically without regenerating the summary
   useEffect(() => {
     // Check for new discoveries when the component mounts and we have a lastUpdated timestamp
     if (lastUpdated && !loading) {
-      checkForNewDiscoveries();
+      console.log('ProjectSummary - Setting up periodic check for new discoveries');
+      
+      // Set up periodic check for new discoveries (every 5 minutes)
+      const interval = setInterval(() => {
+        console.log('ProjectSummary - Running periodic check for new discoveries');
+        if (lastUpdated) {
+          checkForNewDiscoveries();
+        }
+      }, 5 * 60 * 1000);
+      
+      return () => {
+        console.log('ProjectSummary - Clearing periodic check interval');
+        clearInterval(interval);
+      };
     }
-    
-    // Set up periodic check for new discoveries (every 5 minutes)
-    const interval = setInterval(() => {
-      if (lastUpdated) {
-        checkForNewDiscoveries();
-      }
-    }, 5 * 60 * 1000);
-    
-    return () => clearInterval(interval);
   }, [projectId, lastUpdated, loading]);
 
   // Calculate time since last update
@@ -139,10 +157,14 @@ const ProjectSummary: React.FC<ProjectSummaryProps> = ({ projectId }) => {
 
   const fetchSummary = async () => {
     try {
+      console.log('ProjectSummary - Fetching summary from API');
       setLoading(true);
       const response = await apiService.getRecommendations(projectId);
       
+      console.log('ProjectSummary - API response:', response.data);
+      
       if (response.data && response.data.summary) {
+        console.log('ProjectSummary - Setting summary from API response');
         setSummary(response.data.summary);
         setDiscoveries(response.data.discoveries || []);
         
@@ -162,8 +184,10 @@ const ProjectSummary: React.FC<ProjectSummaryProps> = ({ projectId }) => {
           discoveries: response.data.discoveries || [],
           lastUpdated: now.toISOString()
         };
+        console.log('ProjectSummary - Storing summary in localStorage');
         localStorage.setItem(`project_summary_${projectId}`, JSON.stringify(summaryData));
       } else {
+        console.log('ProjectSummary - No summary in API response');
         setSummary(null);
       }
       
@@ -181,11 +205,14 @@ const ProjectSummary: React.FC<ProjectSummaryProps> = ({ projectId }) => {
 
   const generateSummary = async (force: boolean = false) => {
     try {
+      console.log('ProjectSummary - Generating new summary, force =', force);
       setGenerating(true);
       setError('');
       
       // First trigger a search to find new discoveries
+      console.log('ProjectSummary - Triggering search');
       const searchResponse = await apiService.triggerSearch(projectId, force);
+      console.log('ProjectSummary - Search triggered response:', searchResponse.data);
       
       // Show a message that the search is running in the background
       setSummary(prev => {
@@ -203,12 +230,16 @@ ${prev ? '\n\n### Previous summary:\n' + prev : ''}`;
       });
       
       // Wait a moment to allow the search to start processing
+      console.log('ProjectSummary - Waiting for search to process');
       await new Promise(resolve => setTimeout(resolve, 3000));
       
       // Then generate a new summary
+      console.log('ProjectSummary - Getting recommendations after search');
       const response = await apiService.getRecommendations(projectId);
+      console.log('ProjectSummary - Recommendations response:', response.data);
       
       if (response.data && response.data.summary) {
+        console.log('ProjectSummary - Setting new summary from recommendations');
         setSummary(response.data.summary);
         setDiscoveries(response.data.discoveries || []);
         
@@ -228,8 +259,10 @@ ${prev ? '\n\n### Previous summary:\n' + prev : ''}`;
           discoveries: response.data.discoveries || [],
           lastUpdated: now.toISOString()
         };
+        console.log('ProjectSummary - Storing new summary in localStorage');
         localStorage.setItem(`project_summary_${projectId}`, JSON.stringify(summaryData));
       } else {
+        console.log('ProjectSummary - No summary in recommendations response');
         const searchInProgressMessage = `
 ## 🔍 Search in progress...
 
@@ -240,6 +273,7 @@ Check back later to see the results, or refresh this page.`;
         setSummary(searchInProgressMessage);
         
         // We don't store this temporary message in localStorage
+        console.log('ProjectSummary - Set temporary search in progress message');
       }
     } catch (err: any) {
       setError('Failed to generate summary. Please try again.');
@@ -369,9 +403,9 @@ Check back later to see the results, or refresh this page.`;
                       {discovery.title}
                     </Typography>
                     <Typography variant="body2" color="text.secondary" paragraph>
-                      {discovery.description.length > 200 
+                      {discovery.description && discovery.description.length > 200 
                         ? `${discovery.description.substring(0, 200)}...` 
-                        : discovery.description}
+                        : discovery.description || 'No description available'}
                     </Typography>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <Box sx={{ display: 'flex', gap: 1 }}>
@@ -381,7 +415,7 @@ Check back later to see the results, or refresh this page.`;
                           color="primary" 
                           variant="outlined" 
                         />
-                        {discovery.categories.slice(0, 2).map((category: string, i: number) => (
+                        {discovery.categories && Array.isArray(discovery.categories) && discovery.categories.slice(0, 2).map((category: string, i: number) => (
                           <Chip key={i} label={category} size="small" />
                         ))}
                       </Box>
