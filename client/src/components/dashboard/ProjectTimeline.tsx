@@ -14,9 +14,19 @@ interface ProjectTimelineProps {
   contextEntries: any[];
 }
 
+// Define the TimelineItem interface
+interface TimelineItemType {
+  type: 'milestone' | 'discovery' | 'context';
+  title: string;
+  date: Date;
+  achieved?: boolean;
+  contextType?: string;
+  data: any;
+}
+
 // Helper function to combine and sort timeline items
-const createTimelineItems = (milestones: any[], discoveries: any[], contextEntries: any[]) => {
-  const items = [];
+const createTimelineItems = (milestones: any[], discoveries: any[], contextEntries: any[]): TimelineItemType[] => {
+  const items: TimelineItemType[] = [];
   
   // Add milestones
   if (milestones && Array.isArray(milestones)) {
