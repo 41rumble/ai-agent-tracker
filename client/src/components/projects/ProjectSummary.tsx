@@ -169,7 +169,27 @@ Check back later to see the results, or refresh this page.`);
                     borderRadius: 1
                   }
                 }}>
-                  <ReactMarkdown>
+                  <ReactMarkdown components={{
+                    // Customize how different markdown elements are rendered
+                    h1: ({node, ...props}) => <Typography variant="h4" gutterBottom {...props} />,
+                    h2: ({node, ...props}) => <Typography variant="h5" gutterBottom {...props} />,
+                    h3: ({node, ...props}) => <Typography variant="h6" gutterBottom {...props} />,
+                    h4: ({node, ...props}) => <Typography variant="subtitle1" gutterBottom fontWeight="bold" {...props} />,
+                    h5: ({node, ...props}) => <Typography variant="subtitle2" gutterBottom fontWeight="bold" {...props} />,
+                    h6: ({node, ...props}) => <Typography variant="subtitle2" gutterBottom fontWeight="bold" {...props} />,
+                    p: ({node, ...props}) => <Typography variant="body1" paragraph {...props} />,
+                    ul: ({node, ...props}) => <Box component="ul" sx={{ pl: 2, mb: 2 }} {...props} />,
+                    ol: ({node, ...props}) => <Box component="ol" sx={{ pl: 2, mb: 2 }} {...props} />,
+                    li: ({node, ...props}) => <Box component="li" sx={{ mb: 0.5 }} {...props} />,
+                    a: ({node, ...props}) => <Button component="a" variant="text" size="small" {...props} />,
+                    blockquote: ({node, ...props}) => (
+                      <Box component="blockquote" sx={{ borderLeft: '4px solid #ddd', pl: 2, py: 1, my: 2, fontStyle: 'italic' }} {...props} />
+                    ),
+                    code: ({node, inline, ...props}) => 
+                      inline ? 
+                        <Box component="code" sx={{ fontFamily: 'monospace', backgroundColor: 'rgba(0, 0, 0, 0.05)', p: 0.5, borderRadius: 1 }} {...props} /> :
+                        <Box component="pre" sx={{ fontFamily: 'monospace', backgroundColor: 'rgba(0, 0, 0, 0.05)', p: 1.5, borderRadius: 1, overflowX: 'auto' }} {...props} />
+                  }}>
                     {summary}
                   </ReactMarkdown>
                 </Box>

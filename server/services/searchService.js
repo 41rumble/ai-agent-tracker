@@ -632,7 +632,15 @@ const searchService = {
             Discoveries:
             ${discoveries.map(d => `- ${d.title}: ${d.description} (Relevance: ${d.relevanceScore}/10)`).join('\n')}
             
-            Provide a concise summary highlighting the most relevant findings and explaining why they matter to this project.`
+            Provide a concise summary highlighting the most relevant findings and explaining why they matter to this project.
+            
+            IMPORTANT FORMATTING INSTRUCTIONS:
+            1. Format your response using proper markdown syntax
+            2. Use ## for main headings and ### for subheadings
+            3. Use proper markdown for lists (1., 2., etc. for numbered lists or - for bullet points)
+            4. Use **bold** for emphasis, not asterisks showing in the text
+            5. Do NOT include any visible markdown syntax in the content (like visible asterisks or visible number signs)
+            6. Make sure the markdown is properly formatted and will render correctly`
           }
         ]
       });
