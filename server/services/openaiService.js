@@ -225,6 +225,90 @@ const openaiService = {
       console.error('Query generation error:', error);
       throw new Error('Failed to generate search queries');
     }
+  },
+
+  /**
+   * Process newsletter content to extract discoveries
+   * @param {string} content - The newsletter content
+   * @param {Object} context - Context information about the project
+   * @returns {Promise<Object>} - Processed discoveries
+   */
+  processNewsletterContent: async (content, context) => {
+    try {
+      console.log('Processing newsletter content with OpenAI');
+      
+      // Truncate content if it's too long
+      const truncatedContent = content.length > 15000 
+        ? content.substring(0, 15000) + '...(content truncated)'
+        : content;
+      
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4-turbo",
+        messages: [
+          {
+            role: "system",
+            content: `You are an AI assistant that analyzes newsletter content to extract relevant information for a project. 
+            The project is about ${context.projectDomain} with a focus on ${context.projectGoals.join(', ')} and interests in ${context.projectInterests.join(', ')}.
+            
+            Your task is to identify distinct pieces of information in the newsletter that are relevant to the project and format them as structured discoveries.`
+          },
+          {
+            role: "user",
+            content: `Analyze the following newsletter content from "${context.newsletterName}" with subject "${context.newsletterSubject}" and extract relevant information for my project.
+            
+            Project details:
+            - Name: ${context.projectName}
+            - Description: ${context.projectDescription}
+            - Domain: ${context.projectDomain}
+            - Goals: ${context.projectGoals.join(', ')}
+            - Interests: ${context.projectInterests.join(', ')}
+            
+            Newsletter content:
+            ${truncatedContent}
+            
+            For each relevant piece of information, create a structured discovery with:
+            1. Title: A concise, descriptive title
+            2. Description: A summary of the information and why it's relevant to the project
+            3. Source: The original source if mentioned, otherwise use the newsletter name
+            4. Relevance Score: A number from 1-10 indicating how relevant this is to the project
+            5. Categories: 2-5 categories that this information falls under
+            6. Type: One of [Article, Discussion, News, Research, Tool, Other]
+            
+            Format your response as a JSON object with an array of discoveries. Only include information that is actually relevant to the project.
+            
+            Example format:
+            {
+              "discoveries": [
+                {
+                  "title": "New AI-Powered Animation Tool Released",
+                  "description": "Studio XYZ has released a new tool that uses machine learning to automate character animation. This is relevant because it aligns with the project's interest in AI for animation pipelines.",
+                  "source": "https://example.com/tool-announcement",
+                  "relevanceScore": 8,
+                  "categories": ["AI", "Animation", "Tools", "Character Animation"],
+                  "type": "Tool"
+                }
+              ]
+            }`
+          }
+        ],
+        response_format: { type: "json_object" }
+      });
+
+      const responseContent = completion.choices[0].message.content;
+      
+      try {
+        const parsedResponse = JSON.parse(responseContent);
+        console.log(`Extracted ${parsedResponse.discoveries?.length || 0} discoveries from newsletter`);
+        return parsedResponse;
+      } catch (parseError) {
+        console.error('Error parsing OpenAI JSON response:', parseError);
+        console.log('Raw response:', responseContent);
+        return { discoveries: [] };
+      }
+    } catch (error) {
+      console.error('Newsletter processing error:', error);
+      throw new Error('Failed to process newsletter content');
+    }
   }
 };
 

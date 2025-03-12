@@ -5,6 +5,7 @@ const cors = require('cors');
 const apiConfig = require('./config/apiConfig');
 const routes = require('./routes');
 const schedulerService = require('./services/schedulerService');
+const emailImporter = require('./services/emailImporter');
 
 const app = express();
 
@@ -35,6 +36,14 @@ mongoose.connect(apiConfig.mongodb.uri)
     console.log('Connected to MongoDB');
     // Initialize scheduler after DB connection
     schedulerService.initializeScheduler();
+    
+    // Initialize email importer if enabled
+    if (process.env.EMAIL_IMPORT_ENABLED === 'true') {
+      console.log('Initializing email importer...');
+      emailImporter.scheduleEmailChecks();
+    } else {
+      console.log('Email importer is disabled');
+    }
   })
   .catch(err => {
     console.error('MongoDB connection error:', err);

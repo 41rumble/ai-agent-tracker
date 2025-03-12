@@ -23,6 +23,15 @@ const UserSchema = new Schema({
   },
   lastLogin: {
     type: Date
+  },
+  emailImportSettings: {
+    enabled: {
+      type: Boolean,
+      default: false
+    },
+    sources: [{
+      type: String
+    }]
   }
 }, { timestamps: true });
 

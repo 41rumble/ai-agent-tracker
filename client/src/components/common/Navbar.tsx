@@ -23,7 +23,8 @@ import {
   Search, 
   Schedule, 
   AccountCircle,
-  Logout
+  Logout,
+  Settings as SettingsIcon
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -108,11 +109,11 @@ const Navbar: React.FC = () => {
                 open={Boolean(anchorEl)}
                 onClose={handleClose}
               >
-                <MenuItem onClick={() => { handleClose(); navigate('/profile'); }}>
+                <MenuItem onClick={() => { handleClose(); navigate('/settings'); }}>
                   <ListItemIcon>
-                    <AccountCircle fontSize="small" />
+                    <SettingsIcon fontSize="small" />
                   </ListItemIcon>
-                  Profile
+                  Settings
                 </MenuItem>
                 <MenuItem onClick={handleLogout}>
                   <ListItemIcon>
@@ -162,6 +163,14 @@ const Navbar: React.FC = () => {
                   <Schedule />
                 </ListItemIcon>
                 <ListItemText primary="Schedules" />
+              </ListItemButton>
+            </ListItem>
+            <ListItem disablePadding>
+              <ListItemButton onClick={() => navigate('/settings')}>
+                <ListItemIcon>
+                  <SettingsIcon />
+                </ListItemIcon>
+                <ListItemText primary="Settings" />
               </ListItemButton>
             </ListItem>
           </List>

@@ -19,6 +19,7 @@ import ProjectDetailPage from './pages/ProjectDetailPage';
 import NewProjectPage from './pages/NewProjectPage';
 import EditProjectPage from './pages/EditProjectPage';
 import SchedulesPage from './pages/SchedulesPage';
+import SettingsPage from './pages/SettingsPage';
 
 // Create a client for React Query
 const queryClient = new QueryClient();
@@ -100,6 +101,14 @@ const App: React.FC = () => {
                 element={
                   <ProtectedRoute>
                     <SchedulesPage />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/settings" 
+                element={
+                  <ProtectedRoute>
+                    <SettingsPage />
                   </ProtectedRoute>
                 } 
               />

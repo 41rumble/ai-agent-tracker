@@ -89,6 +89,10 @@ export const endpoints = {
     addResponse: (projectId: string, questionId: string) => `/context-agent/project/${projectId}/response/${questionId}`,
     getQuestion: (projectId: string) => `/context-agent/project/${projectId}/question`,
   },
+  emailImport: {
+    check: '/email-import/check',
+    settings: '/email-import/settings',
+  },
 };
 
 // API service functions
@@ -170,6 +174,16 @@ export const apiService = {
   
   generateProjectQuestion: (projectId: string, force: boolean = false) => 
     api.get(`${endpoints.contextAgent.getQuestion(projectId)}${force ? '?force=true' : ''}`),
+    
+  // Email Import
+  getEmailImportSettings: () => 
+    api.get(endpoints.emailImport.settings),
+    
+  updateEmailImportSettings: (settings: { enabled: boolean, sources: string[] }) => 
+    api.put(endpoints.emailImport.settings, settings),
+    
+  runEmailImportCheck: () => 
+    api.post(endpoints.emailImport.check),
 };
 
 export default api;
