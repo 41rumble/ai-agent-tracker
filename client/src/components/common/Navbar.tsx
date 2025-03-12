@@ -12,6 +12,7 @@ import {
   Drawer,
   List,
   ListItem,
+  ListItemButton,
   ListItemIcon,
   ListItemText,
   Divider
@@ -139,32 +140,40 @@ const Navbar: React.FC = () => {
           onKeyDown={toggleDrawer(false)}
         >
           <List>
-            <ListItem button onClick={() => navigate('/dashboard')}>
-              <ListItemIcon>
-                <Dashboard />
-              </ListItemIcon>
-              <ListItemText primary="Dashboard" />
+            <ListItem disablePadding>
+              <ListItemButton onClick={() => navigate('/dashboard')}>
+                <ListItemIcon>
+                  <Dashboard />
+                </ListItemIcon>
+                <ListItemText primary="Dashboard" />
+              </ListItemButton>
             </ListItem>
-            <ListItem button onClick={() => navigate('/projects')}>
-              <ListItemIcon>
-                <Search />
-              </ListItemIcon>
-              <ListItemText primary="Projects" />
+            <ListItem disablePadding>
+              <ListItemButton onClick={() => navigate('/projects')}>
+                <ListItemIcon>
+                  <Search />
+                </ListItemIcon>
+                <ListItemText primary="Projects" />
+              </ListItemButton>
             </ListItem>
-            <ListItem button onClick={() => navigate('/schedules')}>
-              <ListItemIcon>
-                <Schedule />
-              </ListItemIcon>
-              <ListItemText primary="Schedules" />
+            <ListItem disablePadding>
+              <ListItemButton onClick={() => navigate('/schedules')}>
+                <ListItemIcon>
+                  <Schedule />
+                </ListItemIcon>
+                <ListItemText primary="Schedules" />
+              </ListItemButton>
             </ListItem>
           </List>
           <Divider />
           <List>
-            <ListItem button onClick={handleLogout}>
-              <ListItemIcon>
-                <Logout />
-              </ListItemIcon>
-              <ListItemText primary="Logout" />
+            <ListItem disablePadding>
+              <ListItemButton onClick={handleLogout}>
+                <ListItemIcon>
+                  <Logout />
+                </ListItemIcon>
+                <ListItemText primary="Logout" />
+              </ListItemButton>
             </ListItem>
           </List>
         </Box>
