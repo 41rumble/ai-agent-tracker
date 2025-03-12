@@ -45,13 +45,41 @@ const DiscoverySchema = new Schema({
     type: Boolean,
     default: false
   },
+  viewed: {
+    type: Boolean,
+    default: false
+  },
+  viewedAt: {
+    type: Date
+  },
   userFeedback: {
     useful: {
       type: Boolean
     },
+    notUseful: {
+      type: Boolean
+    },
+    relevance: {
+      type: Number,
+      min: 0,
+      max: 10
+    },
     notes: {
       type: String
-    }
+    },
+    tags: [{
+      type: String
+    }]
+  },
+  searchQueryUsed: {
+    type: String
+  },
+  searchContext: {
+    type: Object
+  },
+  hidden: {
+    type: Boolean,
+    default: false
   }
 }, { timestamps: true });
 

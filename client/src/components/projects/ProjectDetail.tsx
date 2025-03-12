@@ -25,6 +25,7 @@ import {
 import { useParams, useNavigate } from 'react-router-dom';
 import { apiService } from '../../services/api';
 import DiscoveryList from '../discoveries/DiscoveryList';
+import NewDiscoveriesTab from '../discoveries/NewDiscoveriesTab';
 import ScheduleList from '../schedules/ScheduleList';
 import ProjectContext from './ProjectContext';
 import ProjectSummary from './ProjectSummary';
@@ -297,9 +298,10 @@ const ProjectDetail: React.FC = () => {
       <Box sx={{ mt: 4 }}>
         <Tabs value={tabValue} onChange={handleTabChange} aria-label="project tabs">
           <Tab label="Overview" id="project-tab-0" aria-controls="project-tabpanel-0" />
-          <Tab label="Discoveries" id="project-tab-1" aria-controls="project-tabpanel-1" />
-          <Tab label="Schedules" id="project-tab-2" aria-controls="project-tabpanel-2" />
-          <Tab label="Context Agent" id="project-tab-3" aria-controls="project-tabpanel-3" />
+          <Tab label="New Discoveries" id="project-tab-1" aria-controls="project-tabpanel-1" />
+          <Tab label="All Discoveries" id="project-tab-2" aria-controls="project-tabpanel-2" />
+          <Tab label="Schedules" id="project-tab-3" aria-controls="project-tabpanel-3" />
+          <Tab label="Context Agent" id="project-tab-4" aria-controls="project-tabpanel-4" />
         </Tabs>
         
         <TabPanel value={tabValue} index={0}>
@@ -377,14 +379,18 @@ const ProjectDetail: React.FC = () => {
         </TabPanel>
         
         <TabPanel value={tabValue} index={1}>
-          {id && <DiscoveryList projectId={id} />}
+          {id && <NewDiscoveriesTab projectId={id} />}
         </TabPanel>
         
         <TabPanel value={tabValue} index={2}>
-          {id && <ScheduleList projectId={id} />}
+          {id && <DiscoveryList projectId={id} />}
         </TabPanel>
         
         <TabPanel value={tabValue} index={3}>
+          {id && <ScheduleList projectId={id} />}
+        </TabPanel>
+        
+        <TabPanel value={tabValue} index={4}>
           {id && <ProjectContext projectId={id} />}
         </TabPanel>
       </Box>

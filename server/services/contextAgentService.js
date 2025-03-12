@@ -411,6 +411,35 @@ const contextAgentService = {
   },
   
   /**
+   * Add feedback about a discovery to the project context
+   */
+  addFeedbackToContext: async (projectId, discoveryId, discoveryTitle, feedbackType, notes = '') => {
+    try {
+      const context = await contextAgentService.getProjectContext(projectId);
+      
+      // Add feedback entry to context
+      context.contextEntries.push({
+        type: 'feedback',
+        content: `${feedbackType === 'positive' ? 'Positive' : 'Negative'} feedback on discovery: "${discoveryTitle}"${notes ? ` - Notes: ${notes}` : ''}`,
+        metadata: {
+          discoveryId,
+          feedbackType,
+          notes
+        },
+        timestamp: new Date()
+      });
+      
+      await context.save();
+      
+      console.log(`Added ${feedbackType} feedback for discovery ${discoveryId} to context`);
+      return context;
+    } catch (error) {
+      console.error('Error adding feedback to context:', error);
+      throw new Error('Failed to add feedback to context');
+    }
+  },
+  
+  /**
    * Generate search queries based on project context
    */
   generateContextualSearchQueries: async (projectId) => {
@@ -423,10 +452,21 @@ const contextAgentService = {
       }
       
       // Get user feedback on discoveries
-      const userFeedback = await Discovery.find({
+      const positiveUserFeedback = await Discovery.find({
         projectId,
         'userFeedback.useful': true
       }).limit(5);
+      
+      // Get negative feedback as well
+      const negativeUserFeedback = await Discovery.find({
+        projectId,
+        'userFeedback.notUseful': true
+      }).limit(5);
+      
+      // Get recent feedback entries from context
+      const recentFeedback = context.contextEntries
+        .filter(entry => entry.type === 'feedback')
+        .slice(-5);
       
       // Use OpenAI to generate contextual search queries
       const completion = await openai.chat.completions.create({
@@ -436,7 +476,9 @@ const contextAgentService = {
             role: "system",
             content: `You are an AI assistant that generates search queries based on a project's context and user feedback.
             Your task is to create targeted search queries that will find information relevant to the user's current project phase and needs.
-            Focus on the core topics and technologies without any time references.`
+            Focus on the core topics and technologies without any time references.
+            
+            Pay special attention to user feedback on previous discoveries to understand what information is most valuable to them.`
           },
           {
             role: "user",
@@ -452,14 +494,22 @@ const contextAgentService = {
             Recent context:
             ${context.contextEntries.slice(-5).map(entry => `${entry.type}: ${entry.content}`).join('\n')}
             
-            User liked these discoveries:
-            ${userFeedback.map(d => `- ${d.title}`).join('\n')}
+            Recent feedback:
+            ${recentFeedback.map(entry => entry.content).join('\n')}
+            
+            User found these discoveries useful:
+            ${positiveUserFeedback.map(d => `- ${d.title}`).join('\n')}
+            
+            User did NOT find these discoveries useful:
+            ${negativeUserFeedback.map(d => `- ${d.title}`).join('\n')}
             
             CRITICAL REQUIREMENTS:
             1. DO NOT include ANY dates, years, or time references (like "2023", "2024", etc.)
             2. DO NOT use words like "recent", "latest", "new", "current", etc.
             3. Focus ONLY on the core topics and technologies
             4. Keep queries simple and focused on specific concepts
+            5. Learn from the user's feedback - focus on topics similar to what they found useful
+            6. Avoid topics similar to what they found not useful
             
             Return the queries as a JSON array: {"queries": ["query1", "query2", ..."]}`
           }

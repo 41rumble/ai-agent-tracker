@@ -120,14 +120,23 @@ export const apiService = {
     api.delete(endpoints.projects.detail(id)),
   
   // Discoveries
-  getDiscoveries: (projectId: string) => 
-    api.get(endpoints.discoveries.byProject(projectId)),
+  getDiscoveries: (projectId: string, filter: string = 'all', sort: string = 'relevance') => 
+    api.get(`${endpoints.discoveries.byProject(projectId)}?filter=${filter}&sort=${sort}`),
   
   getDiscovery: (id: string) => 
     api.get(endpoints.discoveries.detail(id)),
   
   updateDiscoveryFeedback: (id: string, feedback: any) => 
     api.put(endpoints.discoveries.detail(id), { userFeedback: feedback }),
+    
+  markDiscoveryAsViewed: (id: string) => 
+    api.put(`${endpoints.discoveries.detail(id)}/viewed`, {}),
+    
+  toggleDiscoveryHidden: (id: string) => 
+    api.put(`${endpoints.discoveries.detail(id)}/toggle-hidden`, {}),
+    
+  bulkUpdateDiscoveries: (projectId: string, data: { ids?: string[], action: string, filter?: string }) => 
+    api.post(`${endpoints.discoveries.byProject(projectId)}/bulk-update`, data),
   
   // Schedules
   getSchedules: (projectId: string) => 
