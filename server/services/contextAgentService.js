@@ -354,7 +354,8 @@ const contextAgentService = {
           {
             role: "system",
             content: `You are an AI assistant that generates search queries based on a project's context and user feedback.
-            Your task is to create targeted search queries that will find information relevant to the user's current project phase and needs.`
+            Your task is to create targeted search queries that will find RECENT information (from the past 3 months) relevant to the user's current project phase and needs.
+            Focus on the most up-to-date content and latest developments.`
           },
           {
             role: "user",
@@ -373,7 +374,9 @@ const contextAgentService = {
             User liked these discoveries:
             ${userFeedback.map(d => `- ${d.title}`).join('\n')}
             
-            Return the queries as a JSON array: ["query1", "query2", ...]`
+            IMPORTANT: Focus on content from the past 3 months only. Include time-based terms in your queries (e.g., "2023", "2024", "this month", "recent", "latest", "new", etc.).
+            
+            Return the queries as a JSON array: {"queries": ["query1", "query2", ..."]}`
           }
         ],
         response_format: { type: "json_object" }
@@ -391,7 +394,18 @@ const contextAgentService = {
         queries = queriesText.match(/"([^"]+)"/g)?.map(q => q.replace(/"/g, '')) || [];
       }
       
-      return queries;
+      // Add time constraints to queries that don't already have them
+      const timeConstrainedQueries = queries.map(query => {
+        const hasTimeConstraint = /recent|latest|new|2023|2024|this month|last month|past \d+ (days|weeks|months)/i.test(query);
+        if (!hasTimeConstraint) {
+          return `${query} (last 3 months)`;
+        }
+        return query;
+      });
+      
+      console.log('Generated time-constrained contextual queries:', timeConstrainedQueries);
+      
+      return timeConstrainedQueries;
     } catch (error) {
       console.error('Error generating contextual search queries:', error);
       throw new Error('Failed to generate contextual search queries');

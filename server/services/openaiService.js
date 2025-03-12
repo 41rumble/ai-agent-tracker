@@ -168,11 +168,15 @@ const openaiService = {
         messages: [
           {
             role: "system",
-            content: `You are an AI assistant that generates search queries to find the latest advancements in ${project.domain} related to specific project goals and interests.`
+            content: `You are an AI assistant that generates search queries to find the latest advancements in ${project.domain} related to specific project goals and interests. 
+            Focus on recent content from the past 3 months.`
           },
           {
             role: "user",
-            content: `Generate 5 search queries to find the latest advancements in ${project.domain} related to the project goals: ${project.goals.join(', ')} and interests: ${project.interests.join(', ')}.`
+            content: `Generate 5 search queries to find the MOST RECENT advancements (within the last 3 months) in ${project.domain} related to the project goals: ${project.goals.join(', ')} and interests: ${project.interests.join(', ')}.
+            
+            Include time-based terms in your queries to prioritize recent content (e.g., "2023", "this month", "recent", "latest", "new", etc.).
+            Format each query to specifically target content from the past 3 months.`
           }
         ]
       });
@@ -182,7 +186,18 @@ const openaiService = {
         .filter(line => line.trim().length > 0)
         .map(line => line.replace(/^\d+\.\s*/, '').trim());
       
-      return queries;
+      // Add time constraints to queries that don't already have them
+      const timeConstrainedQueries = queries.map(query => {
+        const hasTimeConstraint = /recent|latest|new|2023|2024|this month|last month|past \d+ (days|weeks|months)/i.test(query);
+        if (!hasTimeConstraint) {
+          return `${query} (last 3 months)`;
+        }
+        return query;
+      });
+      
+      console.log('Generated time-constrained queries:', timeConstrainedQueries);
+      
+      return timeConstrainedQueries;
     } catch (error) {
       console.error('Query generation error:', error);
       throw new Error('Failed to generate search queries');

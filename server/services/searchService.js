@@ -20,13 +20,15 @@ const searchService = {
         messages: [
           {
             role: "system",
-            content: "You are a helpful assistant that simulates search engine results. Your task is to provide realistic search results for the given query as if you were a search engine."
+            content: "You are a helpful assistant that simulates search engine results. Your task is to provide realistic search results for the given query as if you were a search engine. Focus on RECENT content from the past 3 months only."
           },
           {
             role: "user",
             content: `Generate search results for the query: "${query}".
             
-            Focus on recent and relevant information. Provide realistic titles, descriptions, and URLs.
+            IMPORTANT: Focus ONLY on content from the past 3 months. All results should be from recent sources (December 2023 to March 2024).
+            
+            Provide realistic titles, descriptions, and URLs. Include the publication date in the description (e.g., "Published on February 15, 2024").
             
             Return the results in the following JSON format:
             {
@@ -34,12 +36,13 @@ const searchService = {
                 {
                   "title": "Result title",
                   "description": "Brief description or summary of the result",
-                  "source": "URL of the source"
+                  "source": "URL of the source",
+                  "date": "YYYY-MM-DD" (publication date)
                 }
               ]
             }
             
-            Provide 5-7 relevant results with realistic URLs.`
+            Provide 5-7 relevant results with realistic URLs. All dates must be within the last 3 months.`
           }
         ],
         response_format: { type: "json_object" }
@@ -60,7 +63,26 @@ const searchService = {
       const results = parsedContent.results || [];
       console.log(`Parsed ${results.length} search results`);
       
-      return results;
+      // Process results to ensure they have dates and are recent
+      const processedResults = results.map(result => {
+        // If no date is provided, assign a recent random date
+        if (!result.date) {
+          const now = new Date();
+          const threeMonthsAgo = new Date();
+          threeMonthsAgo.setMonth(now.getMonth() - 3);
+          
+          const randomDate = new Date(
+            threeMonthsAgo.getTime() + Math.random() * (now.getTime() - threeMonthsAgo.getTime())
+          );
+          
+          result.date = randomDate.toISOString().split('T')[0];
+          result.description = `[Published on ${result.date}] ${result.description}`;
+        }
+        
+        return result;
+      });
+      
+      return processedResults;
     } catch (error) {
       console.error(`OpenAI search error: ${error}`);
       console.error('Error stack:', error.stack);
@@ -226,11 +248,40 @@ const searchService = {
         source: result.source
       });
       
+      // Parse publication date if available
+      let publicationDate = null;
+      if (result.date) {
+        try {
+          publicationDate = new Date(result.date);
+          console.log(`Parsed publication date: ${publicationDate} from ${result.date}`);
+        } catch (dateError) {
+          console.error('Error parsing publication date:', dateError);
+          // Default to current date if parsing fails
+          publicationDate = new Date();
+        }
+      } else {
+        // If no date provided, set to a recent date (within last 3 months)
+        const now = new Date();
+        const threeMonthsAgo = new Date();
+        threeMonthsAgo.setMonth(now.getMonth() - 3);
+        
+        publicationDate = new Date(
+          threeMonthsAgo.getTime() + Math.random() * (now.getTime() - threeMonthsAgo.getTime())
+        );
+        console.log(`Generated random recent date: ${publicationDate}`);
+      }
+      
       if (existingDiscovery) {
         // Update existing discovery if relevance score is higher
         if (result.relevanceScore > existingDiscovery.relevanceScore) {
           existingDiscovery.relevanceScore = result.relevanceScore;
           existingDiscovery.categories = result.categories;
+          
+          // Update publication date if available
+          if (publicationDate) {
+            existingDiscovery.publicationDate = publicationDate;
+          }
+          
           await existingDiscovery.save();
         }
         return existingDiscovery;
@@ -243,7 +294,9 @@ const searchService = {
         description: result.description,
         source: result.source,
         relevanceScore: result.relevanceScore,
-        categories: result.categories
+        categories: result.categories,
+        publicationDate: publicationDate,
+        discoveredAt: new Date()
       });
       
       await discovery.save();

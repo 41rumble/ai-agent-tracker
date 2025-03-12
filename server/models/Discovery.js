@@ -32,6 +32,10 @@ const DiscoverySchema = new Schema({
     type: Date,
     default: Date.now
   },
+  publicationDate: {
+    type: Date,
+    default: Date.now
+  },
   presented: {
     type: Boolean,
     default: false

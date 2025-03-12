@@ -37,6 +37,7 @@ interface Discovery {
   relevanceScore: number;
   categories: string[];
   discoveredAt: string;
+  publicationDate?: string;
   userFeedback?: {
     useful?: boolean;
     notes: string;
@@ -190,9 +191,21 @@ const DiscoveryList: React.FC<DiscoveryListProps> = ({ projectId }) => {
                       ))}
                     </Box>
                     
-                    <Typography variant="caption" color="text.secondary" display="block">
-                      Discovered: {new Date(discovery.discoveredAt).toLocaleDateString()}
-                    </Typography>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Typography variant="caption" color="text.secondary" display="block">
+                        Discovered: {new Date(discovery.discoveredAt).toLocaleDateString()}
+                      </Typography>
+                      
+                      {discovery.publicationDate && (
+                        <Chip 
+                          label={`Published: ${new Date(discovery.publicationDate).toLocaleDateString()}`}
+                          size="small"
+                          color="primary"
+                          variant="outlined"
+                          sx={{ fontSize: '0.7rem' }}
+                        />
+                      )}
+                    </Box>
                     
                     {discovery.userFeedback?.useful !== undefined && (
                       <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
