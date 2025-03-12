@@ -26,7 +26,8 @@ import {
   FormControl,
   InputLabel,
   Select,
-  MenuItem
+  MenuItem,
+  SelectChangeEvent
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -162,6 +163,11 @@ const DiscoveryList: React.FC<DiscoveryListProps> = ({ projectId }) => {
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
   };
+  
+  const handleSelectRowsPerPage = (event: SelectChangeEvent<number>) => {
+    setRowsPerPage(Number(event.target.value));
+    setPage(0);
+  };
 
   // Get unique discovery types
   const discoveryTypes = ['All', 'Article', 'Discussion', 'News', 'Research', 'Tool', 'Other'];
@@ -271,7 +277,7 @@ const DiscoveryList: React.FC<DiscoveryListProps> = ({ projectId }) => {
                       <Select
                         labelId="rows-per-page-label"
                         value={rowsPerPage}
-                        onChange={handleChangeRowsPerPage}
+                        onChange={handleSelectRowsPerPage}
                         label="Items per category"
                       >
                         <MenuItem value={3}>3</MenuItem>
