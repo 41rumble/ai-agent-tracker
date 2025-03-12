@@ -112,7 +112,30 @@ const DiscoveryList: React.FC<DiscoveryListProps> = ({ projectId }) => {
       if (response.data && response.data.discoveries) {
         // New format
         console.log('DiscoveryList - Using new format with nested discoveries:', response.data.discoveries);
-        setDiscoveries(response.data.discoveries);
+        
+        if (response.data.discoveries.length > 0) {
+          setDiscoveries(response.data.discoveries);
+        } else {
+          console.log('DiscoveryList - No discoveries found in new format, trying fallback');
+          // Try fallback to old format without filter
+          try {
+            const fallbackResponse = await apiService.getDiscoveries(projectId);
+            console.log('DiscoveryList - Fallback response:', fallbackResponse.data);
+            
+            if (fallbackResponse.data && Array.isArray(fallbackResponse.data)) {
+              console.log('DiscoveryList - Found discoveries in fallback array');
+              setDiscoveries(fallbackResponse.data);
+            } else if (fallbackResponse.data && fallbackResponse.data.discoveries) {
+              console.log('DiscoveryList - Found discoveries in fallback nested property');
+              setDiscoveries(fallbackResponse.data.discoveries);
+            } else {
+              setDiscoveries([]);
+            }
+          } catch (fallbackErr) {
+            console.error('Error in fallback discovery fetch:', fallbackErr);
+            setDiscoveries([]);
+          }
+        }
       } else {
         // Old format
         console.log('DiscoveryList - Using old format:', response.data);

@@ -116,7 +116,35 @@ const NewDiscoveriesTab: React.FC<NewDiscoveriesTabProps> = ({ projectId }) => {
         console.log('NewDiscoveriesTab - Discoveries:', response.data.discoveries);
         console.log('NewDiscoveriesTab - Counts:', response.data.counts);
         
-        setDiscoveries(response.data.discoveries || []);
+        // Check if we have discoveries
+        if (response.data.discoveries && response.data.discoveries.length > 0) {
+          setDiscoveries(response.data.discoveries);
+        } else {
+          console.log('NewDiscoveriesTab - No discoveries found for filter:', filter);
+          setDiscoveries([]);
+          
+          // If we're using the 'all' filter and got no results, try without a filter
+          if (filter === 'all') {
+            try {
+              console.log('NewDiscoveriesTab - Trying to fetch without filter parameter');
+              const fallbackResponse = await apiService.getDiscoveries(projectId);
+              
+              console.log('NewDiscoveriesTab - Fallback response:', fallbackResponse.data);
+              
+              // Check if the fallback response has discoveries
+              if (fallbackResponse.data && Array.isArray(fallbackResponse.data)) {
+                console.log('NewDiscoveriesTab - Found discoveries in fallback response');
+                setDiscoveries(fallbackResponse.data);
+              } else if (fallbackResponse.data && fallbackResponse.data.discoveries) {
+                console.log('NewDiscoveriesTab - Found discoveries in fallback response.discoveries');
+                setDiscoveries(fallbackResponse.data.discoveries);
+              }
+            } catch (fallbackErr) {
+              console.error('Error in fallback discovery fetch:', fallbackErr);
+            }
+          }
+        }
+        
         setCounts(response.data.counts || {
           total: 0,
           new: 0,
