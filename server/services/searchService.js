@@ -250,23 +250,25 @@ const searchService = {
       console.error(`Assistant API search error: ${error}`);
       console.error('Error stack:', error.stack);
       
-      // Fall back to other search methods
-      console.log('Falling back to alternative search methods...');
+      // Fall back to OpenAI web search
+      console.log('Falling back to OpenAI web search...');
       if (apiConfig.openai.webSearchEnabled) {
         return await searchService.performOpenAIWebSearch(query);
       } else {
-        return await searchService.performGoogleItSearch(query);
+        console.error('OpenAI web search not enabled, search failed');
+        throw new Error('Search failed and OpenAI web search not enabled');
       }
     }
   },
   
   performWebSearch: async (query, project = null) => {
-    // Try Assistants API first if project is provided
+    // Try Assistants API first if project is provided and assistants are enabled
     if (project && apiConfig.openai.assistantsEnabled) {
       try {
         return await searchService.performAssistantSearch(query, project);
       } catch (error) {
-        console.error('Assistants API search failed, falling back to other methods:', error);
+        console.error('Assistants API search failed, falling back to OpenAI web search:', error);
+        // Continue to next method
       }
     }
     
@@ -275,12 +277,21 @@ const searchService = {
       try {
         return await searchService.performOpenAIWebSearch(query);
       } catch (error) {
-        console.error('OpenAI web search failed, falling back to google-it:', error);
-        return await searchService.performGoogleItSearch(query);
+        console.error('OpenAI web search failed:', error);
+        
+        // Only use google-it as a last resort if explicitly enabled
+        if (apiConfig.googleSearch.enabled) {
+          console.log('Falling back to google-it as a last resort...');
+          return await searchService.performGoogleItSearch(query);
+        } else {
+          console.error('No search methods available or successful');
+          throw new Error('All OpenAI search methods failed and google-it fallback not enabled');
+        }
       }
     } else {
-      // Fall back to google-it
-      return await searchService.performGoogleItSearch(query);
+      // If neither OpenAI option is available
+      console.error('No OpenAI search methods enabled');
+      throw new Error('OpenAI search methods not enabled');
     }
   },
   
@@ -326,17 +337,26 @@ const searchService = {
     let allResults = [];
     
     // Perform searches for each query
+    let successfulSearches = 0;
+    
     for (const query of queries) {
       try {
         console.log(`Executing search for query: "${query}"`);
         const results = await searchService.performWebSearch(query, project);
         console.log(`Search returned ${results.length} results for query "${query}"`);
         allResults = [...allResults, ...results];
+        successfulSearches++;
       } catch (searchError) {
         console.error(`Error searching for query "${query}":`, searchError);
         console.error('Search error details:', searchError.stack || searchError);
         // Continue with other queries
       }
+    }
+    
+    // If all searches failed, throw an error
+    if (successfulSearches === 0 && queries.length > 0) {
+      console.error('All searches failed. Check if OpenAI search methods are enabled and working.');
+      // Don't throw here, just log the error and continue with empty results
     }
     
     console.log(`Total raw results: ${allResults.length}`);

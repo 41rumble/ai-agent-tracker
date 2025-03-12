@@ -64,9 +64,9 @@ ENABLE_OPENAI_WEB_SEARCH=true
 # Optional: Enable OpenAI's Assistants API with web search (recommended)
 ENABLE_OPENAI_ASSISTANTS=true
 
-# Optional: Google Search fallback (if OpenAI web search is not available)
-GOOGLE_SEARCH_API_KEY=your_google_search_api_key
-GOOGLE_SEARCH_CX=your_google_search_cx
+# Optional: Google Search fallback (only used as a last resort if both OpenAI methods fail)
+# GOOGLE_SEARCH_API_KEY=your_google_search_api_key
+# GOOGLE_SEARCH_CX=your_google_search_cx
 ```
 
 5. Create a `.env` file in the client directory:
@@ -121,14 +121,19 @@ If you have access to OpenAI's `gpt-4o-search-preview` model but not the Assista
 - Higher quality, more relevant results
 - Focus on recent content from the past 3 months
 
-### Google-it Fallback
+### Google-it (Last Resort Only)
 
-If neither OpenAI option is available or if they fail, the system falls back to using the `google-it` package, which:
+The system will only use the `google-it` package as a last resort if:
+1. Both OpenAI methods fail AND
+2. Google Search is explicitly enabled in the configuration
 
+This fallback method:
 - Scrapes Google search results
 - Validates all URLs before processing
 - Filters out invalid or inaccessible links
 - Adds time constraints to focus on recent content
+
+By default, this fallback is disabled to prioritize OpenAI's more reliable search capabilities.
 
 ## License
 
