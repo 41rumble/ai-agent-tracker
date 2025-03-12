@@ -11,21 +11,37 @@ const openai = new OpenAI({
 const searchService = {
   performWebSearch: async (query) => {
     try {
-      // This would be replaced with your actual search API implementation
-      const response = await axios.get(apiConfig.search.baseUrl, {
-        params: {
-          q: query,
-          key: apiConfig.search.apiKey
-        }
+      // Use OpenAI to perform web search
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4-turbo",
+        messages: [
+          {
+            role: "system",
+            content: "You are a helpful assistant that searches the web for information. Your task is to provide search results in a structured format."
+          },
+          {
+            role: "user",
+            content: `Search the web for information about: ${query}. 
+            Return the results in the following JSON format:
+            [
+              {
+                "title": "Result title",
+                "description": "Brief description or summary of the result",
+                "source": "URL of the source"
+              }
+            ]
+            Provide 5-7 relevant results.`
+          }
+        ],
+        response_format: { type: "json_object" }
       });
       
-      return response.data.results.map(result => ({
-        title: result.title,
-        description: result.snippet,
-        source: result.link
-      }));
+      const content = completion.choices[0].message.content;
+      const results = JSON.parse(content).results || [];
+      
+      return results;
     } catch (error) {
-      console.error(`Search API error: ${error}`);
+      console.error(`OpenAI search error: ${error}`);
       throw new Error('Failed to perform search');
     }
   },

@@ -3,10 +3,6 @@ const apiConfig = {
     baseUrl: 'https://api.openai.com/v1',
     apiKey: process.env.OPENAI_API_KEY
   },
-  search: {
-    baseUrl: process.env.SEARCH_API_URL,
-    apiKey: process.env.SEARCH_API_KEY
-  },
   mongodb: {
     uri: process.env.MONGODB_URI
   },
