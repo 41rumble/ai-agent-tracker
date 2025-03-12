@@ -203,7 +203,7 @@ const assistantsService = {
         
         Please use your code interpreter capability to search the web. Here's a Python function you can use:
         
-        ```python
+        \`\`\`python
         import requests
         from bs4 import BeautifulSoup
         import json
@@ -301,7 +301,7 @@ const assistantsService = {
                     print(f"Could not fetch content: Status code {response.status_code}")
             except Exception as e:
                 print(f"Error analyzing result: {str(e)}")
-        ```
+        \`\`\`
         
         After running this code, please analyze the results and provide a summary of the most relevant findings related to ${project.domain} and ${project.interests.join(', ')}. Focus on recent developments from the past 3 months.`
       );
