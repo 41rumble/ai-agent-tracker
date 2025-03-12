@@ -354,8 +354,8 @@ const contextAgentService = {
           {
             role: "system",
             content: `You are an AI assistant that generates search queries based on a project's context and user feedback.
-            Your task is to create targeted search queries that will find RECENT information (from the past 3 months) relevant to the user's current project phase and needs.
-            Focus on the most up-to-date content and latest developments.`
+            Your task is to create targeted search queries that will find information relevant to the user's current project phase and needs.
+            Focus on the core topics and technologies without any time references.`
           },
           {
             role: "user",
@@ -374,7 +374,11 @@ const contextAgentService = {
             User liked these discoveries:
             ${userFeedback.map(d => `- ${d.title}`).join('\n')}
             
-            IMPORTANT: Focus on content from the past 3 months only. Include time-based terms in your queries (e.g., "2023", "2024", "this month", "recent", "latest", "new", etc.).
+            CRITICAL REQUIREMENTS:
+            1. DO NOT include ANY dates, years, or time references (like "2023", "2024", etc.)
+            2. DO NOT use words like "recent", "latest", "new", "current", etc.
+            3. Focus ONLY on the core topics and technologies
+            4. Keep queries simple and focused on specific concepts
             
             Return the queries as a JSON array: {"queries": ["query1", "query2", ..."]}`
           }
@@ -394,18 +398,32 @@ const contextAgentService = {
         queries = queriesText.match(/"([^"]+)"/g)?.map(q => q.replace(/"/g, '')) || [];
       }
       
-      // Add time constraints to queries that don't already have them
-      const timeConstrainedQueries = queries.map(query => {
-        const hasTimeConstraint = /recent|latest|new|2023|2024|this month|last month|past \d+ (days|weeks|months)/i.test(query);
-        if (!hasTimeConstraint) {
-          return `${query} (last 3 months)`;
-        }
-        return query;
+      // Clean up queries to remove any date or time references that might have been included
+      const cleanedQueries = queries.map(query => {
+        // Remove years (2020-2029)
+        let cleaned = query.replace(/\b20(2\d|1\d)\b/g, '');
+        
+        // Remove month names
+        cleaned = cleaned.replace(/\b(January|February|March|April|May|June|July|August|September|October|November|December)\b/gi, '');
+        
+        // Remove time reference words
+        cleaned = cleaned.replace(/\b(recent|latest|new|current|today|upcoming|modern|emerging|this year|past|last)\b/gi, '');
+        
+        // Remove "in the past X" phrases
+        cleaned = cleaned.replace(/\bin the past\s+\w+\b/gi, '');
+        
+        // Remove parenthetical time references
+        cleaned = cleaned.replace(/\s*\(last \d+ months\)\s*/gi, '');
+        
+        // Clean up any double spaces and trim
+        cleaned = cleaned.replace(/\s+/g, ' ').trim();
+        
+        return cleaned;
       });
       
-      console.log('Generated time-constrained contextual queries:', timeConstrainedQueries);
+      console.log('Generated contextual queries:', cleanedQueries);
       
-      return timeConstrainedQueries;
+      return cleanedQueries;
     } catch (error) {
       console.error('Error generating contextual search queries:', error);
       throw new Error('Failed to generate contextual search queries');
