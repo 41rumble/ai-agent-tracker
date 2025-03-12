@@ -144,6 +144,7 @@ const ScheduleList: React.FC<ScheduleListProps> = ({ projectId }) => {
       };
       
       if (editingSchedule) {
+        console.log(`Updating schedule ${editingSchedule._id} with:`, scheduleData);
         await apiService.updateSchedule(editingSchedule._id, scheduleData);
         setSchedules(schedules.map(schedule => 
           schedule._id === editingSchedule._id 
@@ -151,8 +152,17 @@ const ScheduleList: React.FC<ScheduleListProps> = ({ projectId }) => {
             : schedule
         ));
       } else {
+        console.log('Creating new schedule with:', scheduleData);
         const response = await apiService.createSchedule(scheduleData);
-        setSchedules([...schedules, response.data]);
+        console.log('Create schedule response:', response.data);
+        
+        // Handle the response which contains { message, schedule }
+        if (response.data && response.data.schedule) {
+          setSchedules([...schedules, response.data.schedule]);
+        } else {
+          console.error('Unexpected response format:', response.data);
+          setError('Received unexpected response format from server');
+        }
       }
       
       handleCloseDialog();
