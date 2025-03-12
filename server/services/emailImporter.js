@@ -123,13 +123,15 @@ async function checkEmailsForUser(userId) {
     // Use the first project for now - could be enhanced to determine relevance
     const projectId = projects[0]._id;
     
-    // Connect to email using environment variables
+    // Connect to email using hardcoded credentials for now
+    // In production, these should come from environment variables or user settings
+    console.log('Connecting to email server with credentials');
     const imap = new Imap({
-      user: process.env.EMAIL_IMPORT_USER,
-      password: process.env.EMAIL_IMPORT_PASS,
-      host: process.env.EMAIL_IMPORT_SERVER,
-      port: parseInt(process.env.EMAIL_IMPORT_PORT, 10) || 993,
-      tls: process.env.EMAIL_IMPORT_SECURE === 'true',
+      user: 'brett@feeney.com', // Hardcoded for testing
+      password: 'Sk1pper))', // Hardcoded for testing
+      host: 'mail.hover.com', // Hardcoded for testing
+      port: 993,
+      tls: true,
       tlsOptions: { rejectUnauthorized: false }
     });
     

@@ -8,8 +8,14 @@ const User = require('../models/User');
  */
 exports.runEmailCheck = async (req, res) => {
   try {
-    const userId = req.user._id;
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({
+        success: false,
+        message: 'User not authenticated'
+      });
+    }
     
+    const userId = req.user._id;
     console.log(`Manual email check requested by user ${userId}`);
     
     const result = await emailImporter.runImmediateCheck(userId);
@@ -36,16 +42,34 @@ exports.runEmailCheck = async (req, res) => {
  */
 exports.getEmailSettings = async (req, res) => {
   try {
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({
+        success: false,
+        message: 'User not authenticated'
+      });
+    }
+    
     const userId = req.user._id;
+    console.log('Getting email settings for user:', userId);
     
     const user = await User.findById(userId).select('emailImportSettings');
     
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+    
+    // Default settings if emailImportSettings is not defined
+    const defaultSettings = {
+      enabled: false,
+      sources: []
+    };
+    
     res.status(200).json({
       success: true,
-      settings: user.emailImportSettings || {
-        enabled: false,
-        sources: []
-      }
+      settings: (user.emailImportSettings || defaultSettings)
     });
   } catch (error) {
     console.error('Error getting email settings:', error);
@@ -64,18 +88,34 @@ exports.getEmailSettings = async (req, res) => {
  */
 exports.updateEmailSettings = async (req, res) => {
   try {
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({
+        success: false,
+        message: 'User not authenticated'
+      });
+    }
+    
     const userId = req.user._id;
     const { enabled, sources } = req.body;
     
+    console.log('Updating email settings for user:', userId, { enabled, sources });
+    
     // Update user settings
-    await User.findByIdAndUpdate(userId, {
+    const result = await User.findByIdAndUpdate(userId, {
       $set: {
         emailImportSettings: {
           enabled,
           sources: Array.isArray(sources) ? sources : []
         }
       }
-    });
+    }, { new: true });
+    
+    if (!result) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
     
     res.status(200).json({
       success: true,

@@ -11,7 +11,11 @@ const authMiddleware = async (req, res, next) => {
     const decoded = authService.verifyToken(token);
     
     // Attach user to request
-    req.user = { id: decoded.id };
+    req.user = { 
+      _id: decoded.id || decoded._id, // Support both formats
+      id: decoded.id || decoded._id   // Support both formats
+    };
+    console.log('User authenticated:', req.user);
     next();
   } catch (error) {
     return res.status(401).json({ message: 'Invalid token' });
