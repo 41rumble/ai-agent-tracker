@@ -198,8 +198,9 @@ Check back later to see the results, or refresh this page.`);
                     blockquote: ({node, ...props}) => (
                       <Box component="blockquote" sx={{ borderLeft: '4px solid #ddd', pl: 2, py: 1, my: 2, fontStyle: 'italic' }} {...props} />
                     ),
-                    code: ({node, inline, ...props}) => {
-                      return inline ? 
+                    code: (props) => {
+                      // Use a simpler approach - just render all code with the same styling
+                      return (
                         <Typography 
                           component="code" 
                           sx={{ 
@@ -207,10 +208,16 @@ Check back later to see the results, or refresh this page.`);
                             backgroundColor: 'rgba(0, 0, 0, 0.05)', 
                             px: 0.5, 
                             py: 0.25, 
-                            borderRadius: 0.5 
+                            borderRadius: 0.5,
+                            wordBreak: 'break-word'
                           }} 
                           {...props} 
-                        /> :
+                        />
+                      );
+                    },
+                    pre: (props) => {
+                      // Handle code blocks (pre tags)
+                      return (
                         <Box 
                           component="pre" 
                           sx={{ 
@@ -222,7 +229,8 @@ Check back later to see the results, or refresh this page.`);
                             maxWidth: '100%'
                           }} 
                           {...props} 
-                        />;
+                        />
+                      );
                     }
                   }}>
                     {summary}
