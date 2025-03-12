@@ -1,6 +1,7 @@
 const axios = require('axios');
 const apiConfig = require('../config/apiConfig');
 const Discovery = require('../models/Discovery');
+const Project = require('../models/Project');
 const openaiService = require('./openaiService');
 const { OpenAI } = require('openai');
 
@@ -11,76 +12,129 @@ const openai = new OpenAI({
 const searchService = {
   performWebSearch: async (query) => {
     try {
-      // Use OpenAI to perform web search
+      console.log(`Performing web search for query: "${query}"`);
+      
+      // Use OpenAI to simulate web search results
       const completion = await openai.chat.completions.create({
         model: "gpt-4-turbo",
         messages: [
           {
             role: "system",
-            content: "You are a helpful assistant that searches the web for information. Your task is to provide search results in a structured format."
+            content: "You are a helpful assistant that simulates search engine results. Your task is to provide realistic search results for the given query as if you were a search engine."
           },
           {
             role: "user",
-            content: `Search the web for information about: ${query}. 
+            content: `Generate search results for the query: "${query}".
+            
+            Focus on recent and relevant information. Provide realistic titles, descriptions, and URLs.
+            
             Return the results in the following JSON format:
-            [
-              {
-                "title": "Result title",
-                "description": "Brief description or summary of the result",
-                "source": "URL of the source"
-              }
-            ]
-            Provide 5-7 relevant results.`
+            {
+              "results": [
+                {
+                  "title": "Result title",
+                  "description": "Brief description or summary of the result",
+                  "source": "URL of the source"
+                }
+              ]
+            }
+            
+            Provide 5-7 relevant results with realistic URLs.`
           }
         ],
         response_format: { type: "json_object" }
       });
       
       const content = completion.choices[0].message.content;
-      const results = JSON.parse(content).results || [];
+      console.log(`Raw search response: ${content}`);
+      
+      let parsedContent;
+      try {
+        parsedContent = JSON.parse(content);
+      } catch (parseError) {
+        console.error('Error parsing JSON response:', parseError);
+        console.error('Raw content:', content);
+        throw new Error('Failed to parse search results');
+      }
+      
+      const results = parsedContent.results || [];
+      console.log(`Parsed ${results.length} search results`);
       
       return results;
     } catch (error) {
       console.error(`OpenAI search error: ${error}`);
+      console.error('Error stack:', error.stack);
       throw new Error('Failed to perform search');
     }
   },
   
   performProjectSearch: async (project) => {
     try {
+      console.log(`Starting search process for project: ${project.name} (${project._id})`);
+      console.log(`Project goals: ${project.goals.join(', ')}`);
+      console.log(`Project interests: ${project.interests.join(', ')}`);
+      
       // Generate search queries based on project
+      console.log('Generating search queries...');
       const queries = await openaiService.generateSearchQueries(project._id, project);
+      console.log(`Generated ${queries.length} search queries:`, queries);
       
       let allResults = [];
       
       // Perform searches for each query
       for (const query of queries) {
         try {
+          console.log(`Executing search for query: "${query}"`);
           const results = await searchService.performWebSearch(query);
+          console.log(`Search returned ${results.length} results for query "${query}"`);
           allResults = [...allResults, ...results];
         } catch (searchError) {
           console.error(`Error searching for query "${query}":`, searchError);
+          console.error('Search error details:', searchError.stack || searchError);
           // Continue with other queries
         }
       }
       
+      console.log(`Total raw results: ${allResults.length}`);
+      
       // Process and filter results
+      console.log('Processing and evaluating search results...');
       const processedResults = await searchService.processSearchResults(project, allResults);
+      console.log(`Processed ${processedResults.length} results with relevance scores`);
       
       // Store relevant discoveries
+      console.log('Storing relevant discoveries...');
+      let storedCount = 0;
       for (const result of processedResults) {
         if (result.relevanceScore >= 5) { // Only store relevant results
           try {
             await searchService.storeDiscovery(project._id, result);
+            storedCount++;
           } catch (storeError) {
             console.error('Error storing discovery:', storeError);
+            console.error('Store error details:', storeError.stack || storeError);
           }
         }
+      }
+      
+      console.log(`Stored ${storedCount} relevant discoveries for project ${project._id}`);
+      
+      // Update project state to indicate search is complete
+      try {
+        const updatedProject = await Project.findById(project._id);
+        if (updatedProject) {
+          updatedProject.currentState.lastUpdated = new Date();
+          await updatedProject.save();
+          console.log(`Updated project ${project._id} last updated timestamp`);
+        }
+      } catch (updateError) {
+        console.error('Error updating project state:', updateError);
       }
       
       return processedResults;
     } catch (error) {
       console.error('Project search error:', error);
+      console.error('Error stack:', error.stack);
       throw new Error('Failed to perform project search');
     }
   },
