@@ -17,6 +17,7 @@ import {
   Refresh as RefreshIcon,
   Info as InfoIcon
 } from '@mui/icons-material';
+import ReactMarkdown from 'react-markdown';
 import { apiService } from '../../services/api';
 
 interface ProjectSummaryProps {
@@ -66,11 +67,11 @@ const ProjectSummary: React.FC<ProjectSummaryProps> = ({ projectId }) => {
       // Show a message that the search is running in the background
       setSummary(prev => {
         const backgroundMessage = `
-🔍 Search triggered successfully! 
+## 🔍 Search triggered successfully! 
 
 The system is now searching for new information related to your project. This process runs in the background and may take a few minutes to complete.
 
-${prev ? '\n\nPrevious summary:\n' + prev : ''}`;
+${prev ? '\n\n### Previous summary:\n' + prev : ''}`;
         return backgroundMessage;
       });
       
@@ -82,7 +83,7 @@ ${prev ? '\n\nPrevious summary:\n' + prev : ''}`;
         setDiscoveries(response.data.discoveries || []);
       } else {
         setSummary(`
-🔍 Search in progress...
+## 🔍 Search in progress...
 
 The system is currently searching for new information related to your project. This process runs in the background and may take a few minutes to complete.
 
@@ -145,9 +146,33 @@ Check back later to see the results, or refresh this page.`);
                     </IconButton>
                   </Tooltip>
                 </Box>
-                <Typography variant="body1" sx={{ whiteSpace: 'pre-line' }}>
-                  {summary}
-                </Typography>
+                <Box sx={{ 
+                  '& a': { color: 'primary.main' },
+                  '& h1, & h2, & h3, & h4, & h5, & h6': { 
+                    mt: 2, 
+                    mb: 1,
+                    fontWeight: 'bold',
+                    fontFamily: 'inherit'
+                  },
+                  '& p': { mb: 1.5 },
+                  '& ul, & ol': { pl: 2, mb: 1.5 },
+                  '& blockquote': { 
+                    borderLeft: '4px solid #ddd', 
+                    pl: 2, 
+                    fontStyle: 'italic',
+                    my: 1.5
+                  },
+                  '& code': {
+                    fontFamily: 'monospace',
+                    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+                    p: 0.5,
+                    borderRadius: 1
+                  }
+                }}>
+                  <ReactMarkdown>
+                    {summary}
+                  </ReactMarkdown>
+                </Box>
               </CardContent>
             </Card>
             
