@@ -58,9 +58,102 @@ const validateUrl = async (url) => {
 };
 
 const searchService = {
-  performWebSearch: async (query) => {
+  performOpenAIWebSearch: async (query) => {
     try {
-      console.log(`Performing web search for query: "${query}"`);
+      console.log(`Performing OpenAI web search for query: "${query}"`);
+      
+      // Clean up the query by removing quotes
+      let searchQuery = query.replace(/"/g, '');
+      
+      // Add time constraint if not present
+      if (!searchQuery.toLowerCase().includes('past 3 months') && 
+          !searchQuery.toLowerCase().includes('recent')) {
+        searchQuery = `${searchQuery} from the past 3 months`;
+      }
+      
+      console.log(`Enhanced search query for OpenAI web search: "${searchQuery}"`);
+      
+      // Use OpenAI's web search capability
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-search-preview", // Use the web search model
+        web_search_options: {
+          search_context_size: "medium" // Balance between quality and speed
+        },
+        messages: [
+          {
+            role: "system",
+            content: "You are a helpful assistant that searches the web for information. Focus on finding recent, relevant content from the past 3 months."
+          },
+          {
+            role: "user",
+            content: `Search for information about: ${searchQuery}`
+          }
+        ]
+      });
+      
+      // Extract the search results and citations
+      const content = completion.choices[0].message.content;
+      const citations = completion.choices[0].message.annotations || [];
+      
+      console.log(`OpenAI web search returned content with ${citations.length} citations`);
+      
+      // Process the citations into our format
+      const results = [];
+      
+      // First add all cited sources
+      for (const citation of citations) {
+        if (citation.type === 'url_citation' && citation.url_citation) {
+          const { url, title } = citation.url_citation;
+          
+          // Extract the relevant portion of the content that cites this URL
+          const startIndex = citation.url_citation.start_index;
+          const endIndex = citation.url_citation.end_index;
+          const citedContent = content.substring(startIndex, endIndex);
+          
+          try {
+            // Validate the URL
+            const urlValidation = await validateUrl(url);
+            if (urlValidation.isValid) {
+              // Generate a recent date
+              const now = new Date();
+              const threeMonthsAgo = new Date();
+              threeMonthsAgo.setMonth(now.getMonth() - 3);
+              const randomDate = new Date(
+                threeMonthsAgo.getTime() + Math.random() * (now.getTime() - threeMonthsAgo.getTime())
+              );
+              
+              results.push({
+                title: title || 'No title',
+                description: citedContent || 'No description available',
+                source: url,
+                date: randomDate.toISOString().split('T')[0] // Format as YYYY-MM-DD
+              });
+            } else {
+              console.log(`Skipping invalid URL ${url}: ${urlValidation.reason}`);
+            }
+          } catch (error) {
+            console.error(`Error processing citation ${url}:`, error);
+            // Skip this citation
+          }
+        }
+      }
+      
+      console.log(`Processed ${results.length} valid search results from OpenAI web search`);
+      
+      return results;
+    } catch (error) {
+      console.error(`OpenAI web search error: ${error}`);
+      console.error('Error stack:', error.stack);
+      
+      // If OpenAI web search fails, fall back to google-it
+      console.log('Falling back to google-it search...');
+      return searchService.performGoogleItSearch(query);
+    }
+  },
+  
+  performGoogleItSearch: async (query) => {
+    try {
+      console.log(`Performing google-it search for query: "${query}"`);
       
       // Add time constraint to the query if not already present
       const threeMonthsAgo = new Date();
@@ -80,7 +173,7 @@ const searchService = {
         searchQuery = `${searchQuery} recent`;
       }
       
-      console.log(`Enhanced search query: ${searchQuery}`);
+      console.log(`Enhanced search query for google-it: ${searchQuery}`);
       
       // Use google-it to perform a real web search
       const searchResults = await googleIt({ 
@@ -91,43 +184,69 @@ const searchService = {
       
       console.log(`Google search returned ${searchResults.length} results`);
       
-      // Transform the results to our format
-      const results = [];
+      // Validate URLs first, then process only valid ones
+      console.log('Validating search result URLs...');
       
-      for (const result of searchResults) {
+      // Validate all URLs in parallel for efficiency
+      const validationPromises = searchResults.map(async (result) => {
         try {
-          // Validate the URL before adding it
           const urlValidation = await validateUrl(result.link);
-          
           if (urlValidation.isValid) {
-            // Generate a recent date (we don't have actual publication dates from google-it)
-            const now = new Date();
-            const randomDate = new Date(
-              threeMonthsAgo.getTime() + Math.random() * (now.getTime() - threeMonthsAgo.getTime())
-            );
-            
-            results.push({
-              title: result.title,
-              description: result.snippet || 'No description available',
-              source: result.link,
-              date: randomDate.toISOString().split('T')[0] // Format as YYYY-MM-DD
-            });
+            return { ...result, isValid: true };
           } else {
             console.log(`Skipping invalid URL ${result.link}: ${urlValidation.reason}`);
+            return { ...result, isValid: false };
           }
         } catch (error) {
-          console.error(`Error processing search result ${result.link}:`, error);
-          // Skip this result
+          console.error(`Error validating URL ${result.link}:`, error);
+          return { ...result, isValid: false };
         }
-      }
+      });
+      
+      // Wait for all validations to complete
+      const validatedSearchResults = await Promise.all(validationPromises);
+      
+      // Filter to only valid results
+      const validResults = validatedSearchResults.filter(result => result.isValid);
+      console.log(`Found ${validResults.length} valid URLs out of ${searchResults.length} results`);
+      
+      // Now process only the valid results
+      const results = validResults.map(result => {
+        // Generate a recent date (we don't have actual publication dates from google-it)
+        const now = new Date();
+        const randomDate = new Date(
+          threeMonthsAgo.getTime() + Math.random() * (now.getTime() - threeMonthsAgo.getTime())
+        );
+        
+        return {
+          title: result.title,
+          description: result.snippet || 'No description available',
+          source: result.link,
+          date: randomDate.toISOString().split('T')[0] // Format as YYYY-MM-DD
+        };
+      });
       
       console.log(`Processed ${results.length} valid search results with real URLs`);
       
       return results;
     } catch (error) {
-      console.error(`Web search error: ${error}`);
+      console.error(`Google-it search error: ${error}`);
       console.error('Error stack:', error.stack);
       throw new Error('Failed to perform search');
+    }
+  },
+  
+  performWebSearch: async (query) => {
+    // Try OpenAI web search first if enabled, otherwise fall back to google-it
+    if (apiConfig.openai.webSearchEnabled) {
+      try {
+        return await searchService.performOpenAIWebSearch(query);
+      } catch (error) {
+        console.error('OpenAI web search failed, falling back to google-it:', error);
+        return await searchService.performGoogleItSearch(query);
+      }
+    } else {
+      return await searchService.performGoogleItSearch(query);
     }
   },
   

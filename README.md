@@ -57,6 +57,13 @@ MONGODB_URI=mongodb://localhost:27017/ai-agent-tracker
 OPENAI_API_KEY=your_openai_api_key
 JWT_SECRET=your_jwt_secret
 JWT_EXPIRY=24h
+
+# Optional: Enable OpenAI's web search capability (requires gpt-4o-search-preview access)
+ENABLE_OPENAI_WEB_SEARCH=true
+
+# Optional: Google Search fallback (if OpenAI web search is not available)
+GOOGLE_SEARCH_API_KEY=your_google_search_api_key
+GOOGLE_SEARCH_CX=your_google_search_cx
 ```
 
 5. Create a `.env` file in the client directory:
@@ -86,6 +93,28 @@ npm start
 3. Set up automated schedules for monitoring
 4. Explore discoveries and recommendations
 5. Provide feedback to improve future recommendations
+
+## Search Capabilities
+
+The application supports two methods for searching the web:
+
+### OpenAI Web Search (Recommended)
+
+If you have access to OpenAI's `gpt-4o-search-preview` model, you can enable this feature by setting `ENABLE_OPENAI_WEB_SEARCH=true` in your `.env` file. This provides:
+
+- Real-time web search results from the internet
+- Automatic citation of sources
+- Higher quality, more relevant results
+- Focus on recent content from the past 3 months
+
+### Google-it Fallback
+
+If OpenAI web search is not available or fails, the system falls back to using the `google-it` package, which:
+
+- Scrapes Google search results
+- Validates all URLs before processing
+- Filters out invalid or inaccessible links
+- Adds time constraints to focus on recent content
 
 ## License
 
