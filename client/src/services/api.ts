@@ -83,6 +83,12 @@ export const endpoints = {
     search: '/agent/search',
     recommendations: '/agent/recommendations',
   },
+  contextAgent: {
+    getContext: (projectId: string) => `/context-agent/project/${projectId}`,
+    addUpdate: (projectId: string) => `/context-agent/project/${projectId}/update`,
+    addResponse: (projectId: string, questionId: string) => `/context-agent/project/${projectId}/response/${questionId}`,
+    getQuestion: (projectId: string) => `/context-agent/project/${projectId}/question`,
+  },
 };
 
 // API service functions
@@ -142,6 +148,19 @@ export const apiService = {
   
   getRecommendations: (projectId: string) => 
     api.get(`${endpoints.agent.recommendations}?projectId=${projectId}`),
+    
+  // Context Agent
+  getProjectContext: (projectId: string) => 
+    api.get(endpoints.contextAgent.getContext(projectId)),
+  
+  addUserUpdate: (projectId: string, content: string, metadata = {}) => 
+    api.post(endpoints.contextAgent.addUpdate(projectId), { content, metadata }),
+  
+  addUserResponse: (projectId: string, questionId: string, response: string, metadata = {}) => 
+    api.post(endpoints.contextAgent.addResponse(projectId, questionId), { response, metadata }),
+  
+  generateProjectQuestion: (projectId: string) => 
+    api.get(endpoints.contextAgent.getQuestion(projectId)),
 };
 
 export default api;

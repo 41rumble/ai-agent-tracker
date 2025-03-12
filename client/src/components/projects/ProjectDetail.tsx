@@ -26,6 +26,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { apiService } from '../../services/api';
 import DiscoveryList from '../discoveries/DiscoveryList';
 import ScheduleList from '../schedules/ScheduleList';
+import ProjectContext from './ProjectContext';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -263,6 +264,7 @@ const ProjectDetail: React.FC = () => {
           <Tab label="Overview" id="project-tab-0" aria-controls="project-tabpanel-0" />
           <Tab label="Discoveries" id="project-tab-1" aria-controls="project-tabpanel-1" />
           <Tab label="Schedules" id="project-tab-2" aria-controls="project-tabpanel-2" />
+          <Tab label="Context Agent" id="project-tab-3" aria-controls="project-tabpanel-3" />
         </Tabs>
         
         <TabPanel value={tabValue} index={0}>
@@ -331,6 +333,10 @@ const ProjectDetail: React.FC = () => {
         
         <TabPanel value={tabValue} index={2}>
           {id && <ScheduleList projectId={id} />}
+        </TabPanel>
+        
+        <TabPanel value={tabValue} index={3}>
+          {id && <ProjectContext projectId={id} />}
         </TabPanel>
       </Box>
     </Container>

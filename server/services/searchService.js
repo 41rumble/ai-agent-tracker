@@ -79,64 +79,87 @@ const searchService = {
       const queries = await openaiService.generateSearchQueries(project._id, project);
       console.log(`Generated ${queries.length} search queries:`, queries);
       
-      let allResults = [];
-      
-      // Perform searches for each query
-      for (const query of queries) {
-        try {
-          console.log(`Executing search for query: "${query}"`);
-          const results = await searchService.performWebSearch(query);
-          console.log(`Search returned ${results.length} results for query "${query}"`);
-          allResults = [...allResults, ...results];
-        } catch (searchError) {
-          console.error(`Error searching for query "${query}":`, searchError);
-          console.error('Search error details:', searchError.stack || searchError);
-          // Continue with other queries
-        }
-      }
-      
-      console.log(`Total raw results: ${allResults.length}`);
-      
-      // Process and filter results
-      console.log('Processing and evaluating search results...');
-      const processedResults = await searchService.processSearchResults(project, allResults);
-      console.log(`Processed ${processedResults.length} results with relevance scores`);
-      
-      // Store relevant discoveries
-      console.log('Storing relevant discoveries...');
-      let storedCount = 0;
-      for (const result of processedResults) {
-        if (result.relevanceScore >= 5) { // Only store relevant results
-          try {
-            await searchService.storeDiscovery(project._id, result);
-            storedCount++;
-          } catch (storeError) {
-            console.error('Error storing discovery:', storeError);
-            console.error('Store error details:', storeError.stack || storeError);
-          }
-        }
-      }
-      
-      console.log(`Stored ${storedCount} relevant discoveries for project ${project._id}`);
-      
-      // Update project state to indicate search is complete
-      try {
-        const updatedProject = await Project.findById(project._id);
-        if (updatedProject) {
-          updatedProject.currentState.lastUpdated = new Date();
-          await updatedProject.save();
-          console.log(`Updated project ${project._id} last updated timestamp`);
-        }
-      } catch (updateError) {
-        console.error('Error updating project state:', updateError);
-      }
-      
-      return processedResults;
+      return searchService.executeSearchQueries(project, queries);
     } catch (error) {
       console.error('Project search error:', error);
       console.error('Error stack:', error.stack);
       throw new Error('Failed to perform project search');
     }
+  },
+  
+  /**
+   * Perform a contextual search based on project context
+   */
+  performContextualSearch: async (project, queries) => {
+    try {
+      console.log(`Starting contextual search for project: ${project.name} (${project._id})`);
+      console.log(`Using ${queries.length} contextual queries:`, queries);
+      
+      return searchService.executeSearchQueries(project, queries);
+    } catch (error) {
+      console.error('Contextual search error:', error);
+      console.error('Error stack:', error.stack);
+      throw new Error('Failed to perform contextual search');
+    }
+  },
+  
+  /**
+   * Execute search queries and process results
+   */
+  executeSearchQueries: async (project, queries) => {
+    let allResults = [];
+    
+    // Perform searches for each query
+    for (const query of queries) {
+      try {
+        console.log(`Executing search for query: "${query}"`);
+        const results = await searchService.performWebSearch(query);
+        console.log(`Search returned ${results.length} results for query "${query}"`);
+        allResults = [...allResults, ...results];
+      } catch (searchError) {
+        console.error(`Error searching for query "${query}":`, searchError);
+        console.error('Search error details:', searchError.stack || searchError);
+        // Continue with other queries
+      }
+    }
+    
+    console.log(`Total raw results: ${allResults.length}`);
+    
+    // Process and filter results
+    console.log('Processing and evaluating search results...');
+    const processedResults = await searchService.processSearchResults(project, allResults);
+    console.log(`Processed ${processedResults.length} results with relevance scores`);
+    
+    // Store relevant discoveries
+    console.log('Storing relevant discoveries...');
+    let storedCount = 0;
+    for (const result of processedResults) {
+      if (result.relevanceScore >= 5) { // Only store relevant results
+        try {
+          await searchService.storeDiscovery(project._id, result);
+          storedCount++;
+        } catch (storeError) {
+          console.error('Error storing discovery:', storeError);
+          console.error('Store error details:', storeError.stack || storeError);
+        }
+      }
+    }
+    
+    console.log(`Stored ${storedCount} relevant discoveries for project ${project._id}`);
+    
+    // Update project state to indicate search is complete
+    try {
+      const updatedProject = await Project.findById(project._id);
+      if (updatedProject) {
+        updatedProject.currentState.lastUpdated = new Date();
+        await updatedProject.save();
+        console.log(`Updated project ${project._id} last updated timestamp`);
+      }
+    } catch (updateError) {
+      console.error('Error updating project state:', updateError);
+    }
+    
+    return processedResults;
   },
   
   processSearchResults: async (project, results) => {
