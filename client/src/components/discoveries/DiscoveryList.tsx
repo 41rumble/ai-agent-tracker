@@ -38,7 +38,7 @@ interface Discovery {
   categories: string[];
   discoveredAt: string;
   userFeedback?: {
-    useful: boolean;
+    useful?: boolean;
     notes: string;
   };
 }
@@ -97,7 +97,7 @@ const DiscoveryList: React.FC<DiscoveryListProps> = ({ projectId }) => {
           ? { 
               ...d, 
               userFeedback: { 
-                useful: feedbackUseful !== null ? feedbackUseful : undefined, 
+                ...(feedbackUseful !== null ? { useful: feedbackUseful } : {}), 
                 notes: feedbackNotes 
               } 
             } 
