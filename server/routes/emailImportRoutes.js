@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const emailImportController = require('../controllers/emailImportController');
-const { authenticateToken } = require('../middleware/authMiddleware');
+const authMiddleware = require('../middleware/authMiddleware');
 
 // Apply authentication middleware to all routes
-router.use(authenticateToken);
+router.use(authMiddleware);
 
 // Run an immediate email check
 router.post('/check', emailImportController.runEmailCheck);
