@@ -1,10 +1,12 @@
 import React from 'react';
 import {
-  Box, Paper, Typography, Divider, 
+  Box, Paper, Typography, Divider
+} from '@mui/material';
+import {
   Timeline, TimelineItem, TimelineSeparator, 
   TimelineConnector, TimelineContent, TimelineDot,
   TimelineOppositeContent
-} from '@mui/material';
+} from '@mui/lab';
 
 interface ProjectTimelineProps {
   milestones: any[];
