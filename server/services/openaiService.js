@@ -170,18 +170,28 @@ const openaiService = {
         messages: [
           {
             role: "system",
-            content: `You are an AI assistant that generates search queries to find the latest advancements in ${project.domain} related to specific project goals and interests.`
+            content: `You are an AI assistant that generates search queries to find information in ${project.domain} related to specific project goals and interests. NEVER include any dates, years, or time references in your queries.`
           },
           {
             role: "user",
-            content: `Generate 5 search queries to find relevant information about ${project.domain} related to the project goals: ${project.goals.join(', ')} and interests: ${project.interests.join(', ')}.
+            content: `Generate 5 search queries to find information about ${project.domain} related to the project goals: ${project.goals.join(', ')} and interests: ${project.interests.join(', ')}.
             
-            IMPORTANT GUIDELINES:
-            1. Keep queries simple and focused on the core topics
-            2. Use terms like "recent" or "latest" to encourage newer results
-            3. Focus on the specific technologies and concepts relevant to the project
-            4. Make each query distinct to cover different aspects of the project
-            5. Avoid overly complex queries with too many terms`
+            CRITICAL REQUIREMENTS:
+            1. DO NOT include ANY dates, years, or time references (like "2023", "2024", etc.)
+            2. DO NOT use words like "recent", "latest", "new", "current", etc.
+            3. Focus ONLY on the core topics and technologies
+            4. Keep queries simple and focused on specific concepts
+            5. Make each query distinct to cover different aspects of the project
+            
+            Example of good queries:
+            - "AI animation tools for filmmaking"
+            - "Visual effects pipeline optimization techniques"
+            - "Machine learning in character animation"
+            
+            Example of BAD queries (DO NOT use):
+            - "Latest AI animation tools 2023" (contains date)
+            - "Recent advancements in visual effects" (contains time reference)
+            - "New AI research in animation" (contains time reference)`
           }
         ]
       });
@@ -191,9 +201,26 @@ const openaiService = {
         .filter(line => line.trim().length > 0)
         .map(line => line.replace(/^\d+\.\s*/, '').trim());
       
-      console.log('Generated search queries:', queries);
+      // Additional cleaning to remove ANY date or time references
+      const cleanedQueries = queries.map(query => {
+        // Remove years (2020-2029)
+        let cleaned = query.replace(/\b20(2\d|1\d)\b/g, '');
+        
+        // Remove time reference words
+        cleaned = cleaned.replace(/\b(recent|latest|new|current|today|upcoming|modern|emerging|this year)\b/gi, '');
+        
+        // Remove "in the past X" phrases
+        cleaned = cleaned.replace(/\bin the past\s+\w+\b/gi, '');
+        
+        // Clean up any double spaces and trim
+        cleaned = cleaned.replace(/\s+/g, ' ').trim();
+        
+        return cleaned;
+      });
       
-      return queries;
+      console.log('Generated search queries:', cleanedQueries);
+      
+      return cleanedQueries;
     } catch (error) {
       console.error('Query generation error:', error);
       throw new Error('Failed to generate search queries');
