@@ -162,14 +162,6 @@ Check back later to see the results, or refresh this page.`);
     }
   };
 
-  if (loading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
-        <CircularProgress />
-      </Box>
-    );
-  }
-
   // Calculate time since last update
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
@@ -193,6 +185,14 @@ Check back later to see the results, or refresh this page.`);
       }
     };
   }, [lastUpdated]);
+
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   return (
     <Box>
