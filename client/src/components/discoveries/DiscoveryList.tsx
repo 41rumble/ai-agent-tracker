@@ -21,7 +21,12 @@ import {
   Rating,
   Divider,
   Tabs,
-  Tab
+  Tab,
+  TablePagination,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -87,6 +92,8 @@ const DiscoveryList: React.FC<DiscoveryListProps> = ({ projectId }) => {
   const [feedbackNotes, setFeedbackNotes] = useState('');
   const [feedbackUseful, setFeedbackUseful] = useState<boolean | null>(null);
   const [tabValue, setTabValue] = useState(0);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
 
   useEffect(() => {
     fetchDiscoveries();
@@ -144,6 +151,16 @@ const DiscoveryList: React.FC<DiscoveryListProps> = ({ projectId }) => {
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
+    setPage(0); // Reset to first page when changing tabs
+  };
+  
+  const handleChangePage = (event: unknown, newPage: number) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
   };
 
   // Get unique discovery types
@@ -162,6 +179,12 @@ const DiscoveryList: React.FC<DiscoveryListProps> = ({ projectId }) => {
     return matchesSearch && matchesType;
   });
   
+  // Get paginated discoveries for the current tab
+  const paginatedDiscoveries = filteredDiscoveries.slice(
+    page * rowsPerPage,
+    page * rowsPerPage + rowsPerPage
+  );
+  
   // Group discoveries by type for the "All" tab
   const groupedDiscoveries = discoveryTypes.slice(1).map(type => {
     const typeDiscoveries = discoveries.filter(d => 
@@ -173,7 +196,7 @@ const DiscoveryList: React.FC<DiscoveryListProps> = ({ projectId }) => {
     
     return {
       type,
-      items: typeDiscoveries.slice(0, 3), // Only show top 3 for each type in the "All" view
+      items: typeDiscoveries, // Store all items, we'll slice when rendering
       totalCount: typeDiscoveries.length
     };
   }).filter(group => group.items.length > 0);
@@ -242,13 +265,30 @@ const DiscoveryList: React.FC<DiscoveryListProps> = ({ projectId }) => {
                 </Alert>
               ) : (
                 <>
+                  <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+                    <FormControl variant="outlined" size="small" sx={{ minWidth: 150 }}>
+                      <InputLabel id="rows-per-page-label">Items per category</InputLabel>
+                      <Select
+                        labelId="rows-per-page-label"
+                        value={rowsPerPage}
+                        onChange={handleChangeRowsPerPage}
+                        label="Items per category"
+                      >
+                        <MenuItem value={3}>3</MenuItem>
+                        <MenuItem value={5}>5</MenuItem>
+                        <MenuItem value={10}>10</MenuItem>
+                        <MenuItem value={20}>20</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Box>
+                  
                   {groupedDiscoveries.map((group) => (
                     <Box key={group.type} sx={{ mb: 4 }}>
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
                         <Typography variant="h6" component="h2">
                           {group.type}
                         </Typography>
-                        {group.totalCount > 3 && (
+                        {group.totalCount > rowsPerPage && (
                           <Button 
                             size="small" 
                             onClick={() => setTabValue(discoveryTypes.indexOf(group.type))}
@@ -258,7 +298,7 @@ const DiscoveryList: React.FC<DiscoveryListProps> = ({ projectId }) => {
                         )}
                       </Box>
                       <Grid container spacing={3}>
-                        {group.items.map((discovery) => (
+                        {group.items.slice(0, rowsPerPage).map((discovery) => (
                           <Grid item xs={12} md={4} key={discovery._id}>
                             <Card variant="outlined">
                               <CardContent>
@@ -329,8 +369,9 @@ const DiscoveryList: React.FC<DiscoveryListProps> = ({ projectId }) => {
                     No {type.toLowerCase()} discoveries match your search criteria.
                   </Alert>
                 ) : (
-                  <Grid container spacing={3}>
-                    {filteredDiscoveries.map((discovery) => (
+                  <>
+                    <Grid container spacing={3}>
+                      {paginatedDiscoveries.map((discovery) => (
                       <Grid item xs={12} md={6} key={discovery._id}>
                         <Card variant="outlined">
                           <CardContent>
@@ -418,7 +459,21 @@ const DiscoveryList: React.FC<DiscoveryListProps> = ({ projectId }) => {
                         </Card>
                       </Grid>
                     ))}
-                  </Grid>
+                    </Grid>
+                    
+                    <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+                      <TablePagination
+                        component="div"
+                        count={filteredDiscoveries.length}
+                        page={page}
+                        onPageChange={handleChangePage}
+                        rowsPerPage={rowsPerPage}
+                        onRowsPerPageChange={handleChangeRowsPerPage}
+                        rowsPerPageOptions={[5, 10, 25, 50]}
+                        labelRowsPerPage="Discoveries per page:"
+                      />
+                    </Box>
+                  </>
                 )}
               </TabPanel>
             ))}
