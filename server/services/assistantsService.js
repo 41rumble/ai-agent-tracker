@@ -33,12 +33,14 @@ const assistantsService = {
             model: "gpt-4o",
             tools: [
               {
-                "type": "web_search"
-              },
-              {
                 "type": "code_interpreter"
               }
-            ]
+            ],
+            tool_resources: {
+              code_interpreter: {
+                file_search: true
+              }
+            }
           }
         );
         
@@ -57,12 +59,14 @@ const assistantsService = {
           model: "gpt-4o",
           tools: [
             {
-              "type": "web_search"
-            },
-            {
               "type": "code_interpreter"
             }
-          ]
+          ],
+          tool_resources: {
+            code_interpreter: {
+              file_search: true
+            }
+          }
         });
         
         // Update project with assistant ID
@@ -192,10 +196,114 @@ const assistantsService = {
       // Create a thread
       const thread = await assistantsService.createThread();
       
-      // Add the search query as a message
+      // Add the search query as a message with instructions to use code interpreter for web search
       await assistantsService.addMessageToThread(
         thread.id, 
-        `Search for recent advancements in ${project.domain} related to: ${query}. Focus on content from the past 3 months.`
+        `Search for recent advancements in ${project.domain} related to: ${query}. Focus on content from the past 3 months.
+        
+        Please use your code interpreter capability to search the web. Here's a Python function you can use:
+        
+        ```python
+        import requests
+        from bs4 import BeautifulSoup
+        import json
+        
+        def search_web(query, num_results=5):
+            """
+            Search the web for the given query and return the results.
+            
+            Args:
+                query (str): The search query
+                num_results (int): Number of results to return
+                
+            Returns:
+                list: A list of dictionaries containing search results
+            """
+            # Format the query for search
+            search_query = query + " recent months"
+            
+            # Create a user agent to avoid being blocked
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            }
+            
+            # Perform the search
+            search_url = f"https://www.google.com/search?q={search_query.replace(' ', '+')}"
+            response = requests.get(search_url, headers=headers)
+            
+            if response.status_code != 200:
+                return [{"error": f"Search failed with status code {response.status_code}"}]
+            
+            # Parse the results
+            soup = BeautifulSoup(response.text, 'html.parser')
+            search_results = []
+            
+            # Extract search results
+            for result in soup.select('div.g')[:num_results]:
+                try:
+                    title_element = result.select_one('h3')
+                    link_element = result.select_one('a')
+                    snippet_element = result.select_one('div.VwiC3b')
+                    
+                    if title_element and link_element and snippet_element:
+                        title = title_element.get_text()
+                        link = link_element['href']
+                        if link.startswith('/url?q='):
+                            link = link.split('/url?q=')[1].split('&')[0]
+                        snippet = snippet_element.get_text()
+                        
+                        search_results.append({
+                            "title": title,
+                            "url": link,
+                            "snippet": snippet
+                        })
+                except Exception as e:
+                    continue
+            
+            return search_results
+        
+        # Use the function to search for the query
+        results = search_web("${query} ${project.domain} ${project.interests.join(' ')}")
+        print(json.dumps(results, indent=2))
+        
+        # For each result, try to get more information
+        for i, result in enumerate(results):
+            try:
+                print(f"\\nAnalyzing result {i+1}: {result['title']}\\n")
+                
+                # Try to fetch the page content
+                headers = {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                }
+                response = requests.get(result['url'], headers=headers, timeout=5)
+                
+                if response.status_code == 200:
+                    # Parse the content
+                    soup = BeautifulSoup(response.text, 'html.parser')
+                    
+                    # Remove script and style elements
+                    for script in soup(["script", "style"]):
+                        script.extract()
+                    
+                    # Get text
+                    text = soup.get_text()
+                    
+                    # Break into lines and remove leading and trailing space
+                    lines = (line.strip() for line in text.splitlines())
+                    # Break multi-headlines into a line each
+                    chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
+                    # Drop blank lines
+                    text = '\\n'.join(chunk for chunk in chunks if chunk)
+                    
+                    # Print a summary of the content (first 500 chars)
+                    print(f"Content summary: {text[:500]}...")
+                else:
+                    print(f"Could not fetch content: Status code {response.status_code}")
+            except Exception as e:
+                print(f"Error analyzing result: {str(e)}")
+        ```
+        
+        After running this code, please analyze the results and provide a summary of the most relevant findings related to ${project.domain} and ${project.interests.join(', ')}. Focus on recent developments from the past 3 months.`
       );
       
       // Run the assistant

@@ -107,10 +107,12 @@ If you have access to OpenAI's Assistants API, you can enable this feature by se
 
 - Dedicated AI assistants for each project
 - Persistent threads for ongoing conversations
-- Built-in web search capabilities
+- Web search via code interpreter
 - Advanced reasoning and analysis of search results
 - Automatic categorization and relevance scoring
 - Focus on recent content from the past 3 months
+
+Note: The Assistants API uses code interpreter to perform web searches, as the direct web_search tool is not yet available in the API.
 
 ### OpenAI Web Search (Alternative)
 
