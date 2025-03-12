@@ -27,6 +27,7 @@ import { apiService } from '../../services/api';
 import DiscoveryList from '../discoveries/DiscoveryList';
 import ScheduleList from '../schedules/ScheduleList';
 import ProjectContext from './ProjectContext';
+import ProjectSummary from './ProjectSummary';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -268,18 +269,19 @@ const ProjectDetail: React.FC = () => {
         </Tabs>
         
         <TabPanel value={tabValue} index={0}>
-          <Paper sx={{ p: 3 }}>
-            <Typography variant="h5" gutterBottom>
-              Project Overview
-            </Typography>
-            <Typography variant="body1" paragraph>
-              This project is tracking advancements in {project.domain} with a focus on 
-              {project.interests.length > 0 ? ` ${project.interests.join(', ')}` : ' various areas'}.
-            </Typography>
-            
-            <Typography variant="h6" gutterBottom>
-              Milestones
-            </Typography>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            <Paper sx={{ p: 3 }}>
+              <Typography variant="h5" gutterBottom>
+                Project Overview
+              </Typography>
+              <Typography variant="body1" paragraph>
+                This project is tracking advancements in {project.domain} with a focus on 
+                {project.interests.length > 0 ? ` ${project.interests.join(', ')}` : ' various areas'}.
+              </Typography>
+              
+              <Typography variant="h6" gutterBottom>
+                Milestones
+              </Typography>
             {project.currentState.milestones && project.currentState.milestones.length > 0 ? (
               project.currentState.milestones.map((milestone, index) => (
                 <Box key={index} sx={{ mb: 2 }}>
@@ -325,6 +327,10 @@ const ProjectDetail: React.FC = () => {
               </Button>
             </Box>
           </Paper>
+          
+          {/* Add the ProjectSummary component */}
+          {id && <ProjectSummary projectId={id} />}
+          </Box>
         </TabPanel>
         
         <TabPanel value={tabValue} index={1}>
