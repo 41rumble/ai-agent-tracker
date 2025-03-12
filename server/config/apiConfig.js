@@ -3,6 +3,11 @@ const apiConfig = {
     baseUrl: 'https://api.openai.com/v1',
     apiKey: process.env.OPENAI_API_KEY
   },
+  googleSearch: {
+    apiKey: process.env.GOOGLE_SEARCH_API_KEY || '',
+    cx: process.env.GOOGLE_SEARCH_CX || '',
+    enabled: process.env.GOOGLE_SEARCH_API_KEY && process.env.GOOGLE_SEARCH_CX
+  },
   mongodb: {
     uri: process.env.MONGODB_URI
   },

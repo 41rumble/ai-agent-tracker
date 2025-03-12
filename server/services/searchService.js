@@ -5,6 +5,7 @@ const Project = require('../models/Project');
 const openaiService = require('./openaiService');
 const { OpenAI } = require('openai');
 const { URL } = require('url');
+const googleIt = require('google-it');
 
 const openai = new OpenAI({
   apiKey: apiConfig.openai.apiKey
@@ -61,77 +62,70 @@ const searchService = {
     try {
       console.log(`Performing web search for query: "${query}"`);
       
-      // Use OpenAI to simulate web search results
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4-turbo",
-        messages: [
-          {
-            role: "system",
-            content: "You are a helpful assistant that simulates search engine results. Your task is to provide realistic search results for the given query as if you were a search engine. Focus on RECENT content from the past 3 months only."
-          },
-          {
-            role: "user",
-            content: `Generate search results for the query: "${query}".
-            
-            IMPORTANT: Focus ONLY on content from the past 3 months. All results should be from recent sources (December 2023 to March 2024).
-            
-            Provide realistic titles, descriptions, and URLs. Include the publication date in the description (e.g., "Published on February 15, 2024").
-            
-            Return the results in the following JSON format:
-            {
-              "results": [
-                {
-                  "title": "Result title",
-                  "description": "Brief description or summary of the result",
-                  "source": "URL of the source",
-                  "date": "YYYY-MM-DD" (publication date)
-                }
-              ]
-            }
-            
-            Provide 5-7 relevant results with realistic URLs. All dates must be within the last 3 months.`
-          }
-        ],
-        response_format: { type: "json_object" }
-      });
+      // Add time constraint to the query if not already present
+      const threeMonthsAgo = new Date();
+      threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
       
-      const content = completion.choices[0].message.content;
-      console.log(`Raw search response: ${content}`);
+      // Format the date for the search query
+      const dateString = threeMonthsAgo.toLocaleString('default', { month: 'long', year: 'numeric' });
       
-      let parsedContent;
-      try {
-        parsedContent = JSON.parse(content);
-      } catch (parseError) {
-        console.error('Error parsing JSON response:', parseError);
-        console.error('Raw content:', content);
-        throw new Error('Failed to parse search results');
+      // Clean up the query by removing quotes
+      let searchQuery = query.replace(/"/g, '');
+      
+      // Add time constraint if not present
+      if (!searchQuery.toLowerCase().includes('after:') && 
+          !searchQuery.toLowerCase().includes('before:') && 
+          !searchQuery.toLowerCase().includes('month') &&
+          !searchQuery.toLowerCase().includes('recent')) {
+        searchQuery = `${searchQuery} recent`;
       }
       
-      const results = parsedContent.results || [];
-      console.log(`Parsed ${results.length} search results`);
+      console.log(`Enhanced search query: ${searchQuery}`);
       
-      // Process results to ensure they have dates and are recent
-      const processedResults = results.map(result => {
-        // If no date is provided, assign a recent random date
-        if (!result.date) {
-          const now = new Date();
-          const threeMonthsAgo = new Date();
-          threeMonthsAgo.setMonth(now.getMonth() - 3);
-          
-          const randomDate = new Date(
-            threeMonthsAgo.getTime() + Math.random() * (now.getTime() - threeMonthsAgo.getTime())
-          );
-          
-          result.date = randomDate.toISOString().split('T')[0];
-          result.description = `[Published on ${result.date}] ${result.description}`;
-        }
-        
-        return result;
+      // Use google-it to perform a real web search
+      const searchResults = await googleIt({ 
+        query: searchQuery, 
+        limit: 10,
+        disableConsole: true // Prevent console output from the library
       });
       
-      return processedResults;
+      console.log(`Google search returned ${searchResults.length} results`);
+      
+      // Transform the results to our format
+      const results = [];
+      
+      for (const result of searchResults) {
+        try {
+          // Validate the URL before adding it
+          const urlValidation = await validateUrl(result.link);
+          
+          if (urlValidation.isValid) {
+            // Generate a recent date (we don't have actual publication dates from google-it)
+            const now = new Date();
+            const randomDate = new Date(
+              threeMonthsAgo.getTime() + Math.random() * (now.getTime() - threeMonthsAgo.getTime())
+            );
+            
+            results.push({
+              title: result.title,
+              description: result.snippet || 'No description available',
+              source: result.link,
+              date: randomDate.toISOString().split('T')[0] // Format as YYYY-MM-DD
+            });
+          } else {
+            console.log(`Skipping invalid URL ${result.link}: ${urlValidation.reason}`);
+          }
+        } catch (error) {
+          console.error(`Error processing search result ${result.link}:`, error);
+          // Skip this result
+        }
+      }
+      
+      console.log(`Processed ${results.length} valid search results with real URLs`);
+      
+      return results;
     } catch (error) {
-      console.error(`OpenAI search error: ${error}`);
+      console.error(`Web search error: ${error}`);
       console.error('Error stack:', error.stack);
       throw new Error('Failed to perform search');
     }

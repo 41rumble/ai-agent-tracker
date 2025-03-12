@@ -13,7 +13,8 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
-    "concurrently": "^8.2.2"
+    "concurrently": "^8.2.2",
+    "google-it": "^1.6.4"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
