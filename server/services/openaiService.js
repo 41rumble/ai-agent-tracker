@@ -246,7 +246,15 @@ const openaiService = {
       let systemPrompt = `You are an AI assistant that analyzes newsletter content to extract relevant information for a project. 
       The project is about ${context.projectDomain} with a focus on ${context.projectGoals.join(', ')} and interests in ${context.projectInterests.join(', ')}.
       
-      Your task is to identify distinct pieces of information in the newsletter that are relevant to the project and format them as structured discoveries.`;
+      Your task is to identify distinct pieces of information in the newsletter that are relevant to the project and format them as structured discoveries.
+      
+      IMPORTANT GUIDELINES:
+      1. Focus on SUBSTANTIVE content only - ignore advertisements, promotional content, and generic announcements
+      2. Extract information about new tools, technologies, research papers, and advancements that are directly or indirectly related to the project's domain and goals
+      3. Prioritize content that represents actual technological advancements, not marketing material
+      4. For each item, evaluate its relevance to the project based on how it might help achieve the project's goals or align with its interests
+      5. Only include items with genuine informational value - skip generic news or promotional content
+      6. Focus on extracting factual information about tools, technologies, and research`;
       
       // Add special instructions for specific newsletters
       if (context.newsletterName.includes('alphasignal.ai')) {
@@ -257,17 +265,35 @@ const openaiService = {
         2. AI development frameworks and SDKs
         3. AI tools for creative work, coding, and automation
         4. Tutorials and guides for AI developers
+        5. Research papers and technical advancements
+        6. Open source projects and libraries
         
-        The newsletter has a structured format with multiple sections. Each section contains multiple items with titles, descriptions, and often links. Extract ALL of these as separate discoveries.
+        The newsletter has a structured format with multiple sections. Each section contains multiple items with titles, descriptions, and often links. Extract ONLY the substantive, informative items as separate discoveries.
+        
+        CRITICAL: Focus on the actual content of each item, not just its title or category. Evaluate each item based on:
+        1. Does it contain specific information about a tool, technology, or research advancement?
+        2. Is it relevant to the project's domain and goals?
+        3. Does it provide actionable information or insights?
+        4. Is it a substantive piece of content rather than just promotional material?
+        
+        Only include items that pass these criteria. Skip generic news, announcements, or purely promotional content.
         
         IMPORTANT: Look for the "### ALPHA SIGNAL CONTENT ITEMS ###" and "### EXTRACTED LINKS ###" sections in the content. These contain pre-extracted items and links from the newsletter that you should prioritize. Each item in the ALPHA SIGNAL CONTENT ITEMS section includes a title, URL, category, and popularity information.
         
         For each item in the "ALPHA SIGNAL CONTENT ITEMS" section:
-        1. Create a separate discovery entry
-        2. Use the provided URL as the source - IMPORTANT: Alpha Signal uses special shortened URLs like "https://link.alphasignal.ai/WsvN56" - these are valid and should be preserved exactly as they appear
-        3. Use the title as provided
-        4. Generate a detailed description based on the title and category
-        5. Assign a relevance score based on how well it matches the project goals and interests
+        1. FIRST, evaluate if the item contains substantive information relevant to the project - skip promotional or generic content
+        2. For items that pass this evaluation, create a separate discovery entry
+        3. Use the provided URL as the source - IMPORTANT: Alpha Signal uses special shortened URLs like "https://link.alphasignal.ai/WsvN56" - these are valid and should be preserved exactly as they appear
+        4. Use the title as provided
+        5. Generate a detailed description that explains:
+           - What specific technology, tool, or advancement is being discussed
+           - How it relates to the project's domain and goals
+           - What potential value or application it might have for the project
+        6. Assign a relevance score based on:
+           - Direct relevance to project goals (7-10)
+           - Indirect relevance that could still be valuable (4-6)
+           - Tangential relevance that might provide inspiration (1-3)
+           - No relevance (skip entirely)
         
         SPECIAL NOTE ABOUT ALPHA SIGNAL URLS: Alpha Signal uses a URL shortener with links like "https://link.alphasignal.ai/WsvN56". These are valid URLs that redirect to the actual content. DO NOT modify these URLs or consider them invalid. They are the correct source URLs for the content. ALWAYS preserve the exact format of these URLs (https://link.alphasignal.ai/XXXXX) without any modifications.
         
@@ -327,13 +353,16 @@ const openaiService = {
             6. Type: One of [Article, Discussion, News, Research, Tool, Other]
             
             IMPORTANT INSTRUCTIONS:
-            - Extract ALL URLs mentioned in the newsletter that point to relevant content
-            - Create separate discovery entries for EACH distinct item in the newsletter (news, tool, tutorial, etc.)
-            - For newsletters with sections like "TOP NEWS", "TRENDING SIGNALS", etc., process each item as a separate discovery
-            - For research papers, include the paper title and authors in the description
-            - For tools, include information about availability, pricing, or access if mentioned
-            - For AI models and APIs (like OpenAI's Responses API, Atla AI's Selene, etc.), extract detailed capabilities
-            - Pay special attention to AI development tools, frameworks, and SDKs
+            - Focus ONLY on substantive, informative content - ignore advertisements and generic announcements
+            - Extract URLs mentioned in the newsletter that point to relevant tools, technologies, or research
+            - Create separate discovery entries for EACH distinct item that contains valuable information
+            - For newsletters with sections like "TOP NEWS", "TRENDING SIGNALS", etc., evaluate each item individually
+            - For research papers, include the paper title, authors, and key findings in the description
+            - For tools, include information about capabilities, use cases, and how they relate to the project
+            - For AI models and APIs, extract detailed capabilities and potential applications for the project
+            - Pay special attention to AI development tools, frameworks, and SDKs that could be directly useful
+            - EVALUATE each item for its relevance to the project before including it
+            - SKIP items that are purely promotional or lack substantive information
             - CRITICAL: Always check the "### EXTRACTED LINKS ###" section first for URLs to include
             - When you see "# IMPORTANT ALPHA SIGNAL LINKS - USE THESE EXACT URLS:" in the extracted links section, you MUST use those exact URLs as they are directly extracted from the email and guaranteed to be correct
             - For Alpha Signal newsletters, prioritize items in the "### ALPHA SIGNAL CONTENT ITEMS ###" section
