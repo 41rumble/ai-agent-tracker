@@ -27,16 +27,25 @@ const openaiService = {
       2. Consider both direct and indirect relevance:
          - Direct relevance: The item directly addresses a project goal or interest
          - Indirect relevance: The item could be useful or inspirational for the project even if not directly related
-      3. For VFX and Animation projects, consider tools, technologies, and techniques that could improve:
-         - Rendering pipelines
-         - Asset creation and management
-         - Animation workflows
-         - Collaboration tools
-         - AI-assisted creative tools
-         - Automation of repetitive tasks
+      3. For VFX and Animation projects, consider how each item might relate to:
+         - Rendering pipelines and technologies (e.g., real-time rendering, path tracing)
+         - Asset creation and management (e.g., 3D modeling, texturing, rigging)
+         - Animation workflows (e.g., motion capture, procedural animation)
+         - Collaboration tools (e.g., version control, asset management)
+         - AI-assisted creative tools (e.g., generative models, style transfer)
+         - Automation of repetitive tasks (e.g., scripting, batch processing)
+         - Large language models that could assist with coding or asset creation
+         - Image generation models that could help with concept art or texturing
+         - Video generation or editing tools
+         - Any technology that could be integrated into a creative pipeline
       4. Assume the user is interested in staying informed about advancements in their field
       5. When in doubt, include the item rather than excluding it
       6. NEVER return an empty discoveries array - always evaluate and include all items
+      7. For each item, think about:
+         - How could this technology be applied to VFX or animation workflows?
+         - What specific problems in the creative pipeline might this solve?
+         - How might this technology integrate with existing tools?
+         - What efficiency gains or creative possibilities might this enable?
       
       For each item, provide:
       - A relevance score from 1-10 (use the full range)
@@ -57,10 +66,30 @@ const openaiService = {
       IMPORTANT: You MUST evaluate ALL items and include them in your response, even if they seem only tangentially relevant.
       
       For each item, please:
-      1. Evaluate its relevance to the project on a scale of 1-10
-      2. Provide a more detailed description that explains why it's relevant
-      3. Assign appropriate categories related to the project domain
-      4. Determine the correct content type
+      1. Evaluate its relevance to the project on a scale of 1-10, where:
+         - 8-10: Highly relevant, directly applicable to the project's goals
+         - 5-7: Moderately relevant, could be useful with some adaptation
+         - 3-4: Somewhat relevant, might provide inspiration or future direction
+         - 1-2: Minimally relevant, but still worth tracking
+      
+      2. Provide a more detailed description that explains:
+         - What the technology or tool is
+         - How it could specifically be applied to VFX or animation workflows
+         - Why it's relevant to the project's goals and interests
+         - What specific benefits it might provide
+      
+      3. Assign appropriate categories related to the project domain, such as:
+         - Rendering
+         - Animation
+         - Asset Creation
+         - Pipeline Management
+         - AI Tools
+         - Collaboration
+         - Automation
+         - Creative Tools
+         - Technical Tools
+      
+      4. Determine the correct content type (Article, Tool, Research, News, etc.)
       
       Here are the items to evaluate:
       ${JSON.stringify(discoveries, null, 2)}
