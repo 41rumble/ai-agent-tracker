@@ -271,6 +271,8 @@ const openaiService = {
         
         SPECIAL NOTE ABOUT ALPHA SIGNAL URLS: Alpha Signal uses a URL shortener with links like "https://link.alphasignal.ai/WsvN56". These are valid URLs that redirect to the actual content. DO NOT modify these URLs or consider them invalid. They are the correct source URLs for the content. ALWAYS preserve the exact format of these URLs (https://link.alphasignal.ai/XXXXX) without any modifications.
         
+        CRITICAL INSTRUCTION: When you see a section labeled "# IMPORTANT ALPHA SIGNAL LINKS - USE THESE EXACT URLS:" in the "### EXTRACTED LINKS ###" section, you MUST use those exact URLs as the source for your discoveries. These URLs have been directly extracted from the email and are guaranteed to be correct. DO NOT attempt to modify, clean, or replace these URLs with anything else.
+        
         If there are additional items in the newsletter content that weren't pre-extracted, create discoveries for those as well.
         
         Be sure to extract any URLs that point to original research papers, articles, or tools. If URLs aren't explicitly visible, check the "### EXTRACTED LINKS ###" section for relevant links.
@@ -332,10 +334,12 @@ const openaiService = {
             - For tools, include information about availability, pricing, or access if mentioned
             - For AI models and APIs (like OpenAI's Responses API, Atla AI's Selene, etc.), extract detailed capabilities
             - Pay special attention to AI development tools, frameworks, and SDKs
-            - Check the "### EXTRACTED LINKS ###" section for URLs to include
+            - CRITICAL: Always check the "### EXTRACTED LINKS ###" section first for URLs to include
+            - When you see "# IMPORTANT ALPHA SIGNAL LINKS - USE THESE EXACT URLS:" in the extracted links section, you MUST use those exact URLs as they are directly extracted from the email and guaranteed to be correct
             - For Alpha Signal newsletters, prioritize items in the "### ALPHA SIGNAL CONTENT ITEMS ###" section
             - For each item in the ALPHA SIGNAL CONTENT ITEMS section, create a separate discovery using the provided URL, title, and category
             - IMPORTANT: Alpha Signal uses special shortened URLs like "https://link.alphasignal.ai/WsvN56" - these are valid URLs and should be preserved exactly as they appear. DO NOT modify these URLs in any way - they must be kept in their original format to work correctly.
+            - DO NOT rely on your own URL extraction for Alpha Signal links - always use the ones provided in the "# IMPORTANT ALPHA SIGNAL LINKS" section.
             
             Format your response as a JSON object with an array of discoveries. Only include information that is actually relevant to the project.
             

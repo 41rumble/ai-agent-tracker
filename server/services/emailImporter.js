@@ -280,8 +280,26 @@ async function checkEmailsForUser(userId) {
                       // Add extracted links to the content for better processing
                       // Format as a structured section for better OpenAI processing
                       if (extractedLinks.length > 0) {
+                        // First, prioritize Alpha Signal links by moving them to the top
+                        const alphaSignalLinks = extractedLinks.filter(link => link.includes('link.alphasignal.ai'));
+                        const otherLinks = extractedLinks.filter(link => !link.includes('link.alphasignal.ai'));
+                        
+                        // Sort the links so Alpha Signal links come first
+                        const sortedLinks = [...alphaSignalLinks, ...otherLinks];
+                        
                         content += "\n\n### EXTRACTED LINKS ###\n";
-                        extractedLinks.forEach((link, index) => {
+                        
+                        // Add special marker for Alpha Signal links to ensure they're prioritized
+                        if (alphaSignalLinks.length > 0) {
+                          content += "# IMPORTANT ALPHA SIGNAL LINKS - USE THESE EXACT URLS:\n";
+                          alphaSignalLinks.forEach((link, index) => {
+                            content += `[Alpha Signal Link ${index + 1}] ${link}\n`;
+                          });
+                          content += "\n# OTHER EXTRACTED LINKS:\n";
+                        }
+                        
+                        // Add all links with indices
+                        sortedLinks.forEach((link, index) => {
                           content += `[Link ${index + 1}] ${link}\n`;
                         });
                       }
@@ -329,9 +347,30 @@ async function checkEmailsForUser(userId) {
                             });
                             
                             // Also add these URLs to the extracted links if they're not already there
+                            // and ensure they're properly formatted
                             sections.extractedItems.forEach(item => {
-                              if (item.url && !extractedLinks.includes(item.url)) {
-                                extractedLinks.push(item.url);
+                              if (item.url) {
+                                // Clean and format Alpha Signal URLs
+                                if (item.url.includes('link.alphasignal.ai')) {
+                                  const codeMatch = item.url.match(/link\.alphasignal\.ai\/([A-Za-z0-9]+)/);
+                                  if (codeMatch && codeMatch[1]) {
+                                    // Ensure we have the clean format
+                                    const cleanUrl = `https://link.alphasignal.ai/${codeMatch[1]}`;
+                                    
+                                    // Update the item URL to the clean version
+                                    item.url = cleanUrl;
+                                    
+                                    // Add to extracted links if not already there
+                                    if (!extractedLinks.includes(cleanUrl)) {
+                                      extractedLinks.push(cleanUrl);
+                                      console.log(`Added cleaned Alpha Signal URL to extracted links: ${cleanUrl}`);
+                                    }
+                                  } else if (!extractedLinks.includes(item.url)) {
+                                    extractedLinks.push(item.url);
+                                  }
+                                } else if (!extractedLinks.includes(item.url)) {
+                                  extractedLinks.push(item.url);
+                                }
                               }
                             });
                           }
