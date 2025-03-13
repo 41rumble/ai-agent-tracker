@@ -242,7 +242,34 @@ async function checkEmailsForUser(userId) {
                       // Also look for URLs in text content that might not be in href attributes
                       const urlRegex = /(https?:\/\/[^\s"'<>()[\]{}]+)/g;
                       while ((match = urlRegex.exec(parsed.html)) !== null) {
-                        const url = match[1];
+                        let url = match[1];
+                        
+                        // Special handling for Alpha Signal URLs
+                        if (url.includes('link.alphasignal.ai')) {
+                          // Make sure the URL is properly formatted
+                          if (!url.startsWith('http')) {
+                            url = 'https://' + url.replace(/^:?\/\//, '');
+                          }
+                          
+                          // Ensure we have the correct Alpha Signal URL format
+                          const codeMatch = url.match(/link\.alphasignal\.ai\/([A-Za-z0-9]+)/);
+                          if (codeMatch && codeMatch[1]) {
+                            // Ensure we have the clean format
+                            url = `https://link.alphasignal.ai/${codeMatch[1]}`;
+                            console.log(`Found Alpha Signal URL in text: ${url}`);
+                          }
+                        }
+                        
+                        if (!extractedLinks.includes(url)) {
+                          extractedLinks.push(url);
+                        }
+                      }
+                      
+                      // Specifically look for Alpha Signal URLs in the content
+                      const alphaSignalRegex = /https?:\/\/link\.alphasignal\.ai\/([A-Za-z0-9]+)/g;
+                      while ((match = alphaSignalRegex.exec(parsed.html)) !== null) {
+                        const url = `https://link.alphasignal.ai/${match[1]}`;
+                        console.log(`Found direct Alpha Signal URL: ${url}`);
                         if (!extractedLinks.includes(url)) {
                           extractedLinks.push(url);
                         }
@@ -495,8 +522,18 @@ function extractAlphaSignalSections(content) {
     // This pattern handles both standard format and the special Alpha Signal format with =3D encoding
     const titleLinkRegex = /<a href=3D["']?(https?:\/\/[^"'\s>]+)["']?[^>]*>([^<]+)<\/a>/g;
     
-    // Also try a more specific pattern for Alpha Signal URLs
-    const alphaSignalLinkRegex = /<a href=3D["']?(https?:\/\/link\.alphasignal\.ai\/[^"'\s>]+)["']?[^>]*>([^<]+)<\/a>/g;
+    // Also try a more specific pattern for Alpha Signal URLs - with multiple encoding variations
+    // The email format can vary significantly between email clients and rendering
+    const alphaSignalLinkRegex = [
+      // Standard format with =3D encoding
+      /<a href=3D["']?(https?:\/\/link\.alphasignal\.ai\/[^"'\s>]+)["']?[^>]*>([^<]+)<\/a>/g,
+      // Format without =3D encoding
+      /<a href=["']?(https?:\/\/link\.alphasignal\.ai\/[^"'\s>]+)["']?[^>]*>([^<]+)<\/a>/g,
+      // Format with different quote styles
+      /<a href=3D'(https?:\/\/link\.alphasignal\.ai\/[^']+)'[^>]*>([^<]+)<\/a>/g,
+      // Format with URL encoding in path
+      /<a href=3D["']?(https?:\/\/link\.alphasignal\.ai\/[A-Za-z0-9%]+)["']?[^>]*>([^<]+)<\/a>/g
+    ];
     let match;
     
     while ((match = titleLinkRegex.exec(content)) !== null) {
@@ -515,7 +552,18 @@ function extractAlphaSignalSections(content) {
       // Special handling for Alpha Signal URLs - preserve their tracking/shortened URLs
       if (url.includes('link.alphasignal.ai')) {
         console.log(`Preserving Alpha Signal tracking URL: ${url}`);
-        // Don't modify these URLs as they're special shortened links
+        // Make sure the URL is properly formatted
+        if (!url.startsWith('http')) {
+          url = 'https://' + url.replace(/^:?\/\//, '');
+        }
+        
+        // Ensure we have the correct Alpha Signal URL format
+        const codeMatch = url.match(/link\.alphasignal\.ai\/([A-Za-z0-9]+)/);
+        if (codeMatch && codeMatch[1]) {
+          // Ensure we have the clean format
+          url = `https://link.alphasignal.ai/${codeMatch[1]}`;
+          console.log(`Cleaned Alpha Signal URL: ${url}`);
+        }
       } else {
         // For other URLs, clean tracking parameters
         try {
@@ -551,44 +599,76 @@ function extractAlphaSignalSections(content) {
       }
     }
     
-    // Try the Alpha Signal specific regex to catch any links we might have missed
-    let alphaMatch;
-    while ((alphaMatch = alphaSignalLinkRegex.exec(content)) !== null) {
-      // Fix URL encoding
-      let url = alphaMatch[1].replace(/=3D/g, '=');
-      
-      // Handle other common URL encoding in emails
-      url = url.replace(/=([0-9A-F]{2})/g, (_, p1) => {
-        try {
-          return String.fromCharCode(parseInt(p1, 16));
-        } catch (e) {
-          return _;
-        }
-      });
-      
-      const title = alphaMatch[2].trim();
-      
-      // Look for category tags
-      const beforeContext = content.substring(Math.max(0, alphaMatch.index - 300), alphaMatch.index);
-      const categoryMatch = beforeContext.match(/<span style=3D[^>]*>([^<]+)<\/span>/);
-      const category = categoryMatch ? categoryMatch[1].replace(/=3D/g, '=').trim() : '';
-      
-      // Look for like counts
-      const afterContext = content.substring(alphaMatch.index, Math.min(content.length, alphaMatch.index + 500));
-      const likesMatch = afterContext.match(/=E2=87=A7\s*([\d,]+)\s*Likes/);
-      const likes = likesMatch ? likesMatch[1].trim() : '';
-      
-      // Check if we already have this URL to avoid duplicates
-      const isDuplicate = items.some(item => item.url === url || item.title === title);
-      
-      if (title && url && !isDuplicate) {
-        console.log(`Found Alpha Signal specific URL: ${url} with title: ${title}`);
-        items.push({
-          title,
-          url,
-          category,
-          likes
+    // Try each of the Alpha Signal specific regex patterns to catch any links we might have missed
+    for (const regexPattern of alphaSignalLinkRegex) {
+      let alphaMatch;
+      while ((alphaMatch = regexPattern.exec(content)) !== null) {
+        // Fix URL encoding
+        let url = alphaMatch[1].replace(/=3D/g, '=');
+        
+        // Handle other common URL encoding in emails
+        url = url.replace(/=([0-9A-F]{2})/g, (_, p1) => {
+          try {
+            return String.fromCharCode(parseInt(p1, 16));
+          } catch (e) {
+            return _;
+          }
         });
+        
+        // Make sure the URL is properly formatted
+        if (!url.startsWith('http')) {
+          url = 'https://' + url.replace(/^:?\/\//, '');
+        }
+        
+        // Ensure we have the correct Alpha Signal URL format
+        if (url.includes('link.alphasignal.ai/')) {
+          // Extract just the code part if needed
+          const codeMatch = url.match(/link\.alphasignal\.ai\/([A-Za-z0-9]+)/);
+          if (codeMatch && codeMatch[1]) {
+            // Ensure we have the clean format
+            url = `https://link.alphasignal.ai/${codeMatch[1]}`;
+          }
+        }
+        
+        const title = alphaMatch[2].trim();
+        
+        // Look for category tags
+        const beforeContext = content.substring(Math.max(0, alphaMatch.index - 300), alphaMatch.index);
+        const categoryMatch = beforeContext.match(/<span style=3D[^>]*>([^<]+)<\/span>/) || 
+                             beforeContext.match(/<span style=[^>]*>([^<]+)<\/span>/);
+        const category = categoryMatch ? categoryMatch[1].replace(/=3D/g, '=').trim() : '';
+        
+        // Look for like counts with multiple patterns
+        const afterContext = content.substring(alphaMatch.index, Math.min(content.length, alphaMatch.index + 500));
+        const likesMatch = afterContext.match(/=E2=87=A7\s*([\d,]+)\s*Likes/) || 
+                          afterContext.match(/⇧\s*([\d,]+)\s*Likes/);
+        const likes = likesMatch ? likesMatch[1].trim() : '';
+        
+        // Check if we already have this URL to avoid duplicates
+        const isDuplicate = items.some(item => {
+          // Check for exact URL match
+          if (item.url === url) return true;
+          
+          // Check for URL with the same Alpha Signal code
+          if (item.url.includes('link.alphasignal.ai/') && url.includes('link.alphasignal.ai/')) {
+            const itemCode = item.url.match(/link\.alphasignal\.ai\/([A-Za-z0-9]+)/);
+            const urlCode = url.match(/link\.alphasignal\.ai\/([A-Za-z0-9]+)/);
+            if (itemCode && urlCode && itemCode[1] === urlCode[1]) return true;
+          }
+          
+          // Check for title match
+          return item.title === title;
+        });
+        
+        if (title && url && !isDuplicate) {
+          console.log(`Found Alpha Signal specific URL: ${url} with title: ${title}`);
+          items.push({
+            title,
+            url,
+            category,
+            likes
+          });
+        }
       }
     }
     

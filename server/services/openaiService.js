@@ -269,7 +269,7 @@ const openaiService = {
         4. Generate a detailed description based on the title and category
         5. Assign a relevance score based on how well it matches the project goals and interests
         
-        SPECIAL NOTE ABOUT ALPHA SIGNAL URLS: Alpha Signal uses a URL shortener with links like "https://link.alphasignal.ai/WsvN56". These are valid URLs that redirect to the actual content. DO NOT modify these URLs or consider them invalid. They are the correct source URLs for the content.
+        SPECIAL NOTE ABOUT ALPHA SIGNAL URLS: Alpha Signal uses a URL shortener with links like "https://link.alphasignal.ai/WsvN56". These are valid URLs that redirect to the actual content. DO NOT modify these URLs or consider them invalid. They are the correct source URLs for the content. ALWAYS preserve the exact format of these URLs (https://link.alphasignal.ai/XXXXX) without any modifications.
         
         If there are additional items in the newsletter content that weren't pre-extracted, create discoveries for those as well.
         
@@ -335,7 +335,7 @@ const openaiService = {
             - Check the "### EXTRACTED LINKS ###" section for URLs to include
             - For Alpha Signal newsletters, prioritize items in the "### ALPHA SIGNAL CONTENT ITEMS ###" section
             - For each item in the ALPHA SIGNAL CONTENT ITEMS section, create a separate discovery using the provided URL, title, and category
-            - IMPORTANT: Alpha Signal uses special shortened URLs like "https://link.alphasignal.ai/WsvN56" - these are valid URLs and should be preserved exactly as they appear
+            - IMPORTANT: Alpha Signal uses special shortened URLs like "https://link.alphasignal.ai/WsvN56" - these are valid URLs and should be preserved exactly as they appear. DO NOT modify these URLs in any way - they must be kept in their original format to work correctly.
             
             Format your response as a JSON object with an array of discoveries. Only include information that is actually relevant to the project.
             
