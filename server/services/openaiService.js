@@ -20,7 +20,29 @@ const openaiService = {
       const systemPrompt = `You are an AI assistant that evaluates the relevance of content items to a specific project.
       The project is about ${context.projectDomain} with a focus on ${context.projectGoals.join(', ')} and interests in ${context.projectInterests.join(', ')}.
       
-      Your task is to evaluate each item for its relevance to the project and provide a relevance score and improved description.`;
+      Your task is to evaluate each item for its relevance to the project and provide a relevance score and improved description.
+      
+      IMPORTANT GUIDELINES FOR RELEVANCE EVALUATION:
+      1. Be generous in your evaluation - if there's any potential relevance to the project, consider it relevant
+      2. Consider both direct and indirect relevance:
+         - Direct relevance: The item directly addresses a project goal or interest
+         - Indirect relevance: The item could be useful or inspirational for the project even if not directly related
+      3. For VFX and Animation projects, consider tools, technologies, and techniques that could improve:
+         - Rendering pipelines
+         - Asset creation and management
+         - Animation workflows
+         - Collaboration tools
+         - AI-assisted creative tools
+         - Automation of repetitive tasks
+      4. Assume the user is interested in staying informed about advancements in their field
+      5. When in doubt, include the item rather than excluding it
+      6. NEVER return an empty discoveries array - always evaluate and include all items
+      
+      For each item, provide:
+      - A relevance score from 1-10 (use the full range)
+      - A detailed description explaining why it's relevant to the project
+      - Appropriate categories that relate to the project domain
+      - The correct content type`;
       
       // Create a user prompt with the discoveries to evaluate
       const userPrompt = `I have a set of content items from an AI newsletter that I need you to evaluate for relevance to my project.
@@ -32,18 +54,22 @@ const openaiService = {
       - Goals: ${context.projectGoals.join(', ')}
       - Interests: ${context.projectInterests.join(', ')}
       
+      IMPORTANT: You MUST evaluate ALL items and include them in your response, even if they seem only tangentially relevant.
+      
       For each item, please:
       1. Evaluate its relevance to the project on a scale of 1-10
       2. Provide a more detailed description that explains why it's relevant
-      3. Assign appropriate categories
+      3. Assign appropriate categories related to the project domain
       4. Determine the correct content type
       
       Here are the items to evaluate:
       ${JSON.stringify(discoveries, null, 2)}
       
-      Return the evaluated items in the same format, but with updated relevance scores, descriptions, categories, and types.
+      Return ALL the evaluated items in the same format, with updated relevance scores, descriptions, categories, and types.
       
-      Format your response as a JSON object with an array of discoveries.
+      CRITICAL: Your response MUST include ALL items from the original list. Do not filter out any items.
+      
+      Format your response as a JSON object with an array of discoveries containing ALL the original items with your evaluations.
       
       Example format:
       {
@@ -58,6 +84,12 @@ const openaiService = {
           }
         ]
       }`;
+      
+      // Log what we're sending to OpenAI
+      console.log('Sending the following discoveries to OpenAI for evaluation:');
+      discoveries.forEach((discovery, index) => {
+        console.log(`Discovery ${index + 1}: ${discovery.title} - Source: ${discovery.source}`);
+      });
       
       // Make the API call
       const completion = await openai.chat.completions.create({
@@ -76,6 +108,9 @@ const openaiService = {
         temperature: 0.5
       });
       
+      // Log the raw response for debugging
+      console.log('Raw OpenAI response:', completion.choices[0].message.content);
+      
       const responseContent = completion.choices[0].message.content;
       
       try {
@@ -84,7 +119,14 @@ const openaiService = {
         
         if (!parsedResponse.discoveries || !Array.isArray(parsedResponse.discoveries)) {
           console.error('Invalid evaluation response format:', parsedResponse);
+          console.log('Returning original discoveries as fallback');
           return { discoveries: discoveries }; // Return original discoveries if evaluation fails
+        }
+        
+        if (parsedResponse.discoveries.length === 0) {
+          console.error('OpenAI returned empty discoveries array');
+          console.log('Returning original discoveries as fallback');
+          return { discoveries: discoveries }; // Return original discoveries if evaluation returns empty
         }
         
         console.log(`Successfully evaluated ${parsedResponse.discoveries.length} discoveries`);
@@ -100,6 +142,7 @@ const openaiService = {
         return parsedResponse;
       } catch (parseError) {
         console.error('Error parsing evaluation response:', parseError);
+        console.log('Returning original discoveries due to parsing error');
         return { discoveries: discoveries }; // Return original discoveries if parsing fails
       }
     } catch (error) {

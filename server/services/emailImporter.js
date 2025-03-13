@@ -97,6 +97,12 @@ async function processNewsletterContent(projectId, newsletterData) {
       }
     }
     
+    // If AI returned empty discoveries but we have direct discoveries, use them
+    if (aiResponse.discoveries.length === 0 && directDiscoveries.length > 0) {
+      console.log('AI returned empty discoveries array, using direct discoveries as fallback');
+      aiResponse = { discoveries: directDiscoveries };
+    }
+    
     console.log(`Found ${aiResponse.discoveries.length} discoveries in AI response`);
     
     // Log the first discovery to verify format
