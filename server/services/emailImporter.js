@@ -64,90 +64,120 @@ async function processNewsletterContent(projectId, newsletterData) {
     
     let aiResponse;
     
-    // If we have direct discoveries, use them directly
+    // If we have direct discoveries, use them directly with our own relevance scoring
     if (directDiscoveries.length > 0) {
-      console.log('Using direct discoveries from Alpha Signal items');
+      console.log('Using direct discoveries from Alpha Signal items with direct relevance scoring');
       
-      try {
-        // Process with OpenAI only for relevance scoring
-        console.log('Sending direct discoveries to OpenAI for relevance scoring');
-        aiResponse = await openaiService.evaluateDiscoveriesRelevance(
-          directDiscoveries,
-          context
-        );
+      // Skip OpenAI evaluation completely for Alpha Signal newsletters
+      // Assign relevance scores and categories based on project domain and keywords
+      const enhancedDiscoveries = directDiscoveries.map(discovery => {
+        // Create a more detailed description based on the title
+        const title = discovery.title;
+        let enhancedDescription = `"${title}" is an AI technology or tool mentioned in the Alpha Signal newsletter.`;
         
-        // Check if OpenAI returned empty discoveries
-        if (!aiResponse.discoveries || aiResponse.discoveries.length === 0) {
-          console.log('OpenAI returned empty discoveries array, using direct discoveries with default relevance scores');
-          
-          // Assign default relevance scores and categories based on project domain
-          const enhancedDiscoveries = directDiscoveries.map(discovery => {
-            // Create a more detailed description
-            let enhancedDescription = discovery.description;
-            
-            // Add potential relevance to VFX/Animation if that's the project domain
-            if (context.projectDomain && context.projectDomain.toLowerCase().includes('vfx') || 
-                context.projectDomain && context.projectDomain.toLowerCase().includes('animation')) {
-              enhancedDescription += ` This could potentially be relevant to ${context.projectDomain} workflows by providing new tools or techniques that could be integrated into the creative pipeline.`;
-            }
-            
-            // Assign default categories based on title keywords
-            const title = discovery.title.toLowerCase();
-            let categories = discovery.categories || [];
-            let relevanceScore = 5; // Default middle score
-            
-            // Check for keywords in the title to determine relevance and categories
-            if (title.includes('ai') || title.includes('ml') || title.includes('model')) {
-              categories.push('AI Tools');
-              relevanceScore = 6;
-            }
-            
-            if (title.includes('image') || title.includes('video') || title.includes('render')) {
-              categories.push('Visual Processing');
-              relevanceScore = 7;
-            }
-            
-            if (title.includes('3d') || title.includes('animation') || title.includes('motion')) {
-              categories.push('Animation');
-              relevanceScore = 8;
-            }
-            
-            if (title.includes('api') || title.includes('sdk') || title.includes('developer')) {
-              categories.push('Development Tools');
-              relevanceScore = 6;
-            }
-            
-            // Ensure we have at least some categories
-            if (categories.length === 0) {
-              categories = ['AI', 'Technology'];
-            }
-            
-            // Remove duplicates
-            categories = [...new Set(categories)];
-            
-            return {
-              ...discovery,
-              description: enhancedDescription,
-              categories: categories,
-              relevanceScore: relevanceScore
-            };
-          });
-          
-          aiResponse = { discoveries: enhancedDiscoveries };
+        // Add specific details based on keywords in the title
+        if (title.toLowerCase().includes('gemma')) {
+          enhancedDescription += ` Gemma is Google's family of lightweight open models, which can be used for various AI applications including text generation, code assistance, and potentially creative workflows.`;
+        } else if (title.toLowerCase().includes('openai')) {
+          enhancedDescription += ` OpenAI develops advanced AI models and tools that can be integrated into creative workflows for automation, content generation, and assistance.`;
+        } else if (title.toLowerCase().includes('image')) {
+          enhancedDescription += ` This appears to be related to image processing or generation, which could be directly relevant to visual effects and animation workflows.`;
+        } else if (title.toLowerCase().includes('api') || title.toLowerCase().includes('sdk')) {
+          enhancedDescription += ` This developer tool could potentially be integrated into existing pipelines to add AI capabilities to creative workflows.`;
         }
-      } catch (error) {
-        console.error('Error evaluating discoveries with OpenAI:', error);
-        console.log('Using direct discoveries with default relevance scores');
         
-        // Use direct discoveries with default relevance scores
-        aiResponse = { 
-          discoveries: directDiscoveries.map(d => ({
-            ...d,
-            relevanceScore: 5,
-            categories: d.categories || ['AI', 'Technology']
-          }))
+        // Add potential relevance to VFX/Animation if that's the project domain
+        if (context.projectDomain && (context.projectDomain.toLowerCase().includes('vfx') || 
+            context.projectDomain.toLowerCase().includes('animation'))) {
+          enhancedDescription += ` This could potentially be relevant to ${context.projectDomain} workflows by providing new tools or techniques that could be integrated into the creative pipeline.`;
+        }
+        
+        // Assign default categories based on title keywords
+        const lowerTitle = title.toLowerCase();
+        let categories = discovery.categories || [];
+        let relevanceScore = 5; // Default middle score
+        let type = 'Tool'; // Default type
+        
+        // Determine type based on title
+        if (lowerTitle.includes('announces') || lowerTitle.includes('launches') || lowerTitle.includes('introduces') || lowerTitle.includes('reveals')) {
+          type = 'News';
+        } else if (lowerTitle.includes('research') || lowerTitle.includes('paper')) {
+          type = 'Research';
+        } else if (lowerTitle.includes('tutorial') || lowerTitle.includes('guide') || lowerTitle.includes('how to')) {
+          type = 'Article';
+        }
+        
+        // Check for keywords in the title to determine relevance and categories
+        if (lowerTitle.includes('ai') || lowerTitle.includes('ml') || lowerTitle.includes('model') || 
+            lowerTitle.includes('gemma') || lowerTitle.includes('gpt') || lowerTitle.includes('llm')) {
+          categories.push('AI Tools');
+          relevanceScore = 6;
+        }
+        
+        if (lowerTitle.includes('image') || lowerTitle.includes('video') || lowerTitle.includes('render') || 
+            lowerTitle.includes('visual') || lowerTitle.includes('luma')) {
+          categories.push('Visual Processing');
+          relevanceScore = 7;
+        }
+        
+        if (lowerTitle.includes('3d') || lowerTitle.includes('animation') || lowerTitle.includes('motion')) {
+          categories.push('Animation');
+          relevanceScore = 8;
+        }
+        
+        if (lowerTitle.includes('api') || lowerTitle.includes('sdk') || lowerTitle.includes('developer')) {
+          categories.push('Development Tools');
+          relevanceScore = 6;
+        }
+        
+        // Check for specific tools that might be relevant to VFX/Animation
+        if (lowerTitle.includes('luma') || lowerTitle.includes('imm')) {
+          categories.push('3D Content');
+          relevanceScore = 7;
+        }
+        
+        if (lowerTitle.includes('editing') || lowerTitle.includes('generation')) {
+          categories.push('Content Creation');
+          relevanceScore = 7;
+        }
+        
+        // Boost relevance score for items that match project interests
+        if (context.projectInterests && Array.isArray(context.projectInterests)) {
+          for (const interest of context.projectInterests) {
+            if (interest && lowerTitle.includes(interest.toLowerCase())) {
+              relevanceScore += 2;
+              break;
+            }
+          }
+        }
+        
+        // Cap relevance score at 10
+        relevanceScore = Math.min(relevanceScore, 10);
+        
+        // Ensure we have at least some categories
+        if (categories.length === 0) {
+          categories = ['AI', 'Technology'];
+        }
+        
+        // Remove duplicates
+        categories = [...new Set(categories)];
+        
+        return {
+          ...discovery,
+          description: enhancedDescription,
+          categories: categories,
+          relevanceScore: relevanceScore,
+          type: type
         };
-      }
+      });
+      
+      // Log the enhanced discoveries
+      console.log('Enhanced discoveries with direct relevance scoring:');
+      enhancedDiscoveries.forEach((discovery, index) => {
+        console.log(`Discovery ${index + 1}: ${discovery.title} - Relevance: ${discovery.relevanceScore}, Type: ${discovery.type}`);
+      });
+      
+      aiResponse = { discoveries: enhancedDiscoveries };
     } else {
       // Process the content with OpenAI as usual
       console.log(`Sending newsletter content to OpenAI for processing (${newsletterData.content.length} characters)`);
@@ -172,63 +202,10 @@ async function processNewsletterContent(projectId, newsletterData) {
     }
     
     // If AI returned empty discoveries but we have direct discoveries, use them
+    // This is a fallback that should rarely be needed now that we're using direct relevance scoring
     if (aiResponse.discoveries.length === 0 && directDiscoveries.length > 0) {
       console.log('AI returned empty discoveries array, using direct discoveries as fallback');
-      
-      // Assign default relevance scores and categories based on project domain
-      const enhancedDiscoveries = directDiscoveries.map(discovery => {
-        // Create a more detailed description
-        let enhancedDescription = discovery.description;
-        
-        // Add potential relevance to VFX/Animation if that's the project domain
-        if (context.projectDomain && context.projectDomain.toLowerCase().includes('vfx') || 
-            context.projectDomain && context.projectDomain.toLowerCase().includes('animation')) {
-          enhancedDescription += ` This could potentially be relevant to ${context.projectDomain} workflows by providing new tools or techniques that could be integrated into the creative pipeline.`;
-        }
-        
-        // Assign default categories based on title keywords
-        const title = discovery.title.toLowerCase();
-        let categories = discovery.categories || [];
-        let relevanceScore = 5; // Default middle score
-        
-        // Check for keywords in the title to determine relevance and categories
-        if (title.includes('ai') || title.includes('ml') || title.includes('model')) {
-          categories.push('AI Tools');
-          relevanceScore = 6;
-        }
-        
-        if (title.includes('image') || title.includes('video') || title.includes('render')) {
-          categories.push('Visual Processing');
-          relevanceScore = 7;
-        }
-        
-        if (title.includes('3d') || title.includes('animation') || title.includes('motion')) {
-          categories.push('Animation');
-          relevanceScore = 8;
-        }
-        
-        if (title.includes('api') || title.includes('sdk') || title.includes('developer')) {
-          categories.push('Development Tools');
-          relevanceScore = 6;
-        }
-        
-        // Ensure we have at least some categories
-        if (categories.length === 0) {
-          categories = ['AI', 'Technology'];
-        }
-        
-        // Remove duplicates
-        categories = [...new Set(categories)];
-        
-        return {
-          ...discovery,
-          description: enhancedDescription,
-          categories: categories,
-          relevanceScore: relevanceScore
-        };
-      });
-      
-      aiResponse = { discoveries: enhancedDiscoveries };
+      aiResponse = { discoveries: directDiscoveries };
     }
     
     console.log(`Found ${aiResponse.discoveries.length} discoveries in AI response`);
