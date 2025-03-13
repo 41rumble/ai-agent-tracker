@@ -237,10 +237,45 @@ const openaiService = {
     try {
       console.log('Processing newsletter content with OpenAI');
       
-      // Truncate content if it's too long
-      const truncatedContent = content.length > 15000 
-        ? content.substring(0, 15000) + '...(content truncated)'
-        : content;
+      // Truncate content if it's too long, but ensure we keep the most important parts
+      let truncatedContent = content;
+      
+      // Check if content is too long
+      if (content.length > 15000) {
+        console.log(`Newsletter content is too long (${content.length} chars), truncating...`);
+        
+        // Extract the important sections first
+        const alphaSignalItemsMatch = content.match(/### ALPHA SIGNAL CONTENT ITEMS ###[\s\S]*?(?=###|$)/);
+        const extractedLinksMatch = content.match(/### EXTRACTED LINKS ###[\s\S]*?(?=###|$)/);
+        const extractedSectionsMatch = content.match(/### EXTRACTED SECTIONS ###[\s\S]*?(?=###|$)/);
+        
+        // Start with a smaller portion of the original content
+        let baseContent = content.substring(0, 5000);
+        
+        // Add the important sections if they exist
+        let importantSections = '';
+        if (alphaSignalItemsMatch) {
+          importantSections += alphaSignalItemsMatch[0] + "\n\n";
+        }
+        if (extractedLinksMatch) {
+          importantSections += extractedLinksMatch[0] + "\n\n";
+        }
+        if (extractedSectionsMatch) {
+          // Only include a portion of the extracted sections to save space
+          const extractedSections = extractedSectionsMatch[0];
+          importantSections += extractedSections.substring(0, Math.min(extractedSections.length, 5000)) + "\n\n";
+        }
+        
+        // Combine the base content with important sections, ensuring we don't exceed the limit
+        truncatedContent = baseContent + "\n\n" + importantSections;
+        
+        // Final truncation if still too long
+        if (truncatedContent.length > 15000) {
+          truncatedContent = truncatedContent.substring(0, 15000) + '...(content truncated)';
+        }
+        
+        console.log(`Truncated content to ${truncatedContent.length} chars, preserving important sections`);
+      }
       
       // Special handling for known newsletter sources
       let systemPrompt = `You are an AI assistant that analyzes newsletter content to extract relevant information for a project. 
@@ -323,6 +358,88 @@ const openaiService = {
         For each news item in the newsletter, create a separate discovery with a high level of detail.`;
       }
       
+      // Log the project details to help with debugging
+      console.log('Project details for relevance evaluation:');
+      console.log(`- Name: ${context.projectName}`);
+      console.log(`- Domain: ${context.projectDomain}`);
+      console.log(`- Goals: ${context.projectGoals.join(', ')}`);
+      console.log(`- Interests: ${context.projectInterests.join(', ')}`);
+      
+      // Check if we have Alpha Signal content items
+      const hasAlphaSignalItems = truncatedContent.includes('### ALPHA SIGNAL CONTENT ITEMS ###');
+      console.log(`Newsletter contains Alpha Signal content items: ${hasAlphaSignalItems}`);
+      
+      // Check if we have extracted links
+      const hasExtractedLinks = truncatedContent.includes('### EXTRACTED LINKS ###');
+      console.log(`Newsletter contains extracted links: ${hasExtractedLinks}`);
+      
+      // Create a more focused user prompt
+      const userPrompt = `Analyze the following newsletter content from "${context.newsletterName}" with subject "${context.newsletterSubject}" and extract relevant information for my project.
+      
+      Project details:
+      - Name: ${context.projectName}
+      - Description: ${context.projectDescription}
+      - Domain: ${context.projectDomain}
+      - Goals: ${context.projectGoals.join(', ')}
+      - Interests: ${context.projectInterests.join(', ')}
+      
+      IMPORTANT: This newsletter contains information about AI tools, technologies, and advancements. Your task is to identify items that are relevant to the project and create structured discoveries for them.
+      
+      ${hasAlphaSignalItems ? 'This newsletter contains pre-extracted Alpha Signal content items that you should prioritize.' : ''}
+      ${hasExtractedLinks ? 'This newsletter contains pre-extracted links that you should use as sources.' : ''}
+      
+      Newsletter content:
+      ${truncatedContent}
+      
+      For each relevant piece of information, create a structured discovery with:
+      1. Title: A concise, descriptive title
+      2. Description: A summary of the information and why it's relevant to the project
+      3. Source: The original source URL if mentioned in the newsletter, otherwise use the newsletter name
+      4. Relevance Score: A number from 1-10 indicating how relevant this is to the project
+      5. Categories: 2-5 categories that this information falls under
+      6. Type: One of [Article, Discussion, News, Research, Tool, Other]
+      
+      IMPORTANT INSTRUCTIONS:
+      - Focus ONLY on substantive, informative content - ignore advertisements and generic announcements
+      - Extract URLs mentioned in the newsletter that point to relevant tools, technologies, or research
+      - Create separate discovery entries for EACH distinct item that contains valuable information
+      - For newsletters with sections like "TOP NEWS", "TRENDING SIGNALS", etc., evaluate each item individually
+      - For research papers, include the paper title, authors, and key findings in the description
+      - For tools, include information about capabilities, use cases, and how they relate to the project
+      - For AI models and APIs, extract detailed capabilities and potential applications for the project
+      - Pay special attention to AI development tools, frameworks, and SDKs that could be directly useful
+      - EVALUATE each item for its relevance to the project before including it
+      - SKIP items that are purely promotional or lack substantive information
+      - CRITICAL: Always check the "### EXTRACTED LINKS ###" section first for URLs to include
+      - When you see "# IMPORTANT ALPHA SIGNAL LINKS - USE THESE EXACT URLS:" in the extracted links section, you MUST use those exact URLs as they are directly extracted from the email and guaranteed to be correct
+      - For Alpha Signal newsletters, prioritize items in the "### ALPHA SIGNAL CONTENT ITEMS ###" section
+      - For each item in the ALPHA SIGNAL CONTENT ITEMS section, create a separate discovery using the provided URL, title, and category
+      - IMPORTANT: Alpha Signal uses special shortened URLs like "https://link.alphasignal.ai/WsvN56" - these are valid URLs and should be preserved exactly as they appear. DO NOT modify these URLs in any way - they must be kept in their original format to work correctly.
+      - DO NOT rely on your own URL extraction for Alpha Signal links - always use the ones provided in the "# IMPORTANT ALPHA SIGNAL LINKS" section.
+      
+      YOU MUST RETURN AT LEAST 3 DISCOVERIES if they are present in the newsletter and relevant to the project.
+      
+      Format your response as a JSON object with an array of discoveries. Only include information that is actually relevant to the project.
+      
+      Example format:
+      {
+        "discoveries": [
+          {
+            "title": "New AI-Powered Animation Tool Released",
+            "description": "Studio XYZ has released a new tool that uses machine learning to automate character animation. This is relevant because it aligns with the project's interest in AI for animation pipelines.",
+            "source": "https://example.com/tool-announcement",
+            "relevanceScore": 8,
+            "categories": ["AI", "Animation", "Tools", "Character Animation"],
+            "type": "Tool"
+          }
+        ]
+      }`;
+      
+      // Log a sample of the user prompt for debugging
+      console.log('User prompt sample (first 500 chars):');
+      console.log(userPrompt.substring(0, 500) + '...');
+      
+      // Make the API call with more specific parameters
       const completion = await openai.chat.completions.create({
         model: "gpt-4-turbo",
         messages: [
@@ -332,62 +449,15 @@ const openaiService = {
           },
           {
             role: "user",
-            content: `Analyze the following newsletter content from "${context.newsletterName}" with subject "${context.newsletterSubject}" and extract relevant information for my project.
-            
-            Project details:
-            - Name: ${context.projectName}
-            - Description: ${context.projectDescription}
-            - Domain: ${context.projectDomain}
-            - Goals: ${context.projectGoals.join(', ')}
-            - Interests: ${context.projectInterests.join(', ')}
-            
-            Newsletter content:
-            ${truncatedContent}
-            
-            For each relevant piece of information, create a structured discovery with:
-            1. Title: A concise, descriptive title
-            2. Description: A summary of the information and why it's relevant to the project
-            3. Source: The original source URL if mentioned in the newsletter, otherwise use the newsletter name
-            4. Relevance Score: A number from 1-10 indicating how relevant this is to the project
-            5. Categories: 2-5 categories that this information falls under
-            6. Type: One of [Article, Discussion, News, Research, Tool, Other]
-            
-            IMPORTANT INSTRUCTIONS:
-            - Focus ONLY on substantive, informative content - ignore advertisements and generic announcements
-            - Extract URLs mentioned in the newsletter that point to relevant tools, technologies, or research
-            - Create separate discovery entries for EACH distinct item that contains valuable information
-            - For newsletters with sections like "TOP NEWS", "TRENDING SIGNALS", etc., evaluate each item individually
-            - For research papers, include the paper title, authors, and key findings in the description
-            - For tools, include information about capabilities, use cases, and how they relate to the project
-            - For AI models and APIs, extract detailed capabilities and potential applications for the project
-            - Pay special attention to AI development tools, frameworks, and SDKs that could be directly useful
-            - EVALUATE each item for its relevance to the project before including it
-            - SKIP items that are purely promotional or lack substantive information
-            - CRITICAL: Always check the "### EXTRACTED LINKS ###" section first for URLs to include
-            - When you see "# IMPORTANT ALPHA SIGNAL LINKS - USE THESE EXACT URLS:" in the extracted links section, you MUST use those exact URLs as they are directly extracted from the email and guaranteed to be correct
-            - For Alpha Signal newsletters, prioritize items in the "### ALPHA SIGNAL CONTENT ITEMS ###" section
-            - For each item in the ALPHA SIGNAL CONTENT ITEMS section, create a separate discovery using the provided URL, title, and category
-            - IMPORTANT: Alpha Signal uses special shortened URLs like "https://link.alphasignal.ai/WsvN56" - these are valid URLs and should be preserved exactly as they appear. DO NOT modify these URLs in any way - they must be kept in their original format to work correctly.
-            - DO NOT rely on your own URL extraction for Alpha Signal links - always use the ones provided in the "# IMPORTANT ALPHA SIGNAL LINKS" section.
-            
-            Format your response as a JSON object with an array of discoveries. Only include information that is actually relevant to the project.
-            
-            Example format:
-            {
-              "discoveries": [
-                {
-                  "title": "New AI-Powered Animation Tool Released",
-                  "description": "Studio XYZ has released a new tool that uses machine learning to automate character animation. This is relevant because it aligns with the project's interest in AI for animation pipelines.",
-                  "source": "https://example.com/tool-announcement",
-                  "relevanceScore": 8,
-                  "categories": ["AI", "Animation", "Tools", "Character Animation"],
-                  "type": "Tool"
-                }
-              ]
-            }`
+            content: userPrompt
           }
         ],
-        response_format: { type: "json_object" }
+        response_format: { type: "json_object" },
+        temperature: 0.7,  // Add some creativity
+        max_tokens: 4000,  // Ensure we have enough tokens for a detailed response
+        top_p: 1,
+        frequency_penalty: 0,
+        presence_penalty: 0
       });
 
       const responseContent = completion.choices[0].message.content;
@@ -404,11 +474,25 @@ const openaiService = {
             console.log('Response is an array, wrapping in discoveries object');
             return { discoveries: parsedResponse };
           }
+          
+          // If we have Alpha Signal items but no discoveries, try to create some basic ones
+          if (hasAlphaSignalItems) {
+            console.log('No discoveries found but Alpha Signal items exist - creating fallback discoveries');
+            return createFallbackDiscoveries(truncatedContent, context);
+          }
+          
           return { discoveries: [] };
         }
         
         if (!Array.isArray(parsedResponse.discoveries)) {
           console.error('OpenAI discoveries is not an array:', parsedResponse.discoveries);
+          
+          // If we have Alpha Signal items but no discoveries, try to create some basic ones
+          if (hasAlphaSignalItems) {
+            console.log('Invalid discoveries format but Alpha Signal items exist - creating fallback discoveries');
+            return createFallbackDiscoveries(truncatedContent, context);
+          }
+          
           return { discoveries: [] };
         }
         
@@ -417,6 +501,12 @@ const openaiService = {
         // Log the first discovery to verify format
         if (parsedResponse.discoveries.length > 0) {
           console.log('Sample discovery from OpenAI:', JSON.stringify(parsedResponse.discoveries[0], null, 2));
+        }
+        
+        // If we have Alpha Signal items but no discoveries, try to create some basic ones
+        if (parsedResponse.discoveries.length === 0 && hasAlphaSignalItems) {
+          console.log('Empty discoveries array but Alpha Signal items exist - creating fallback discoveries');
+          return createFallbackDiscoveries(truncatedContent, context);
         }
         
         return parsedResponse;
@@ -446,5 +536,110 @@ const openaiService = {
     }
   }
 };
+
+/**
+ * Create fallback discoveries from Alpha Signal content items
+ * @param {string} content - The newsletter content
+ * @param {Object} context - Context information about the project
+ * @returns {Object} - Fallback discoveries
+ */
+function createFallbackDiscoveries(content, context) {
+  console.log('Creating fallback discoveries from Alpha Signal content items');
+  
+  try {
+    const discoveries = [];
+    
+    // Extract Alpha Signal content items section
+    const alphaSignalItemsMatch = content.match(/### ALPHA SIGNAL CONTENT ITEMS ###([\s\S]*?)(?=###|$)/);
+    if (!alphaSignalItemsMatch || !alphaSignalItemsMatch[1]) {
+      console.log('No Alpha Signal content items section found in fallback');
+      return { discoveries: [] };
+    }
+    
+    const alphaSignalItemsSection = alphaSignalItemsMatch[1];
+    
+    // Extract individual items
+    const itemRegex = /\[Item (\d+)\] (.*?)\nURL: (.*?)(?:\nCategory: (.*?))?(?:\nPopularity: (.*?))?(?:\n\n|\n$)/g;
+    let match;
+    
+    while ((match = itemRegex.exec(alphaSignalItemsSection)) !== null) {
+      const itemNumber = match[1];
+      const title = match[2].trim();
+      const url = match[3].trim();
+      const category = match[4] ? match[4].trim() : '';
+      const popularity = match[5] ? match[5].trim() : '';
+      
+      // Only process items with both title and URL
+      if (title && url) {
+        console.log(`Creating fallback discovery for item ${itemNumber}: ${title}`);
+        
+        // Create a basic description
+        let description = `This is an AI tool or technology mentioned in the Alpha Signal newsletter.`;
+        if (category) {
+          description += ` It falls under the category of ${category}.`;
+        }
+        description += ` This may be relevant to the project's focus on ${context.projectDomain} and interests in ${context.projectInterests.join(', ')}.`;
+        
+        // Create discovery object
+        const discovery = {
+          title,
+          description,
+          source: url,
+          relevanceScore: 5, // Default middle relevance
+          categories: category ? [category, 'AI', 'Technology'] : ['AI', 'Technology'],
+          type: 'Tool' // Default type
+        };
+        
+        discoveries.push(discovery);
+      }
+    }
+    
+    // Extract important Alpha Signal links
+    if (discoveries.length === 0) {
+      console.log('No items found in Alpha Signal content items, checking extracted links');
+      
+      // Look for the extracted links section
+      const extractedLinksMatch = content.match(/### EXTRACTED LINKS ###([\s\S]*?)(?=###|$)/);
+      if (extractedLinksMatch && extractedLinksMatch[1]) {
+        const extractedLinksSection = extractedLinksMatch[1];
+        
+        // Look for Alpha Signal links specifically
+        const alphaSignalLinksSection = extractedLinksSection.match(/# IMPORTANT ALPHA SIGNAL LINKS - USE THESE EXACT URLS:([\s\S]*?)(?=#|$)/);
+        if (alphaSignalLinksSection && alphaSignalLinksSection[1]) {
+          const alphaSignalLinks = alphaSignalLinksSection[1];
+          
+          // Extract individual links
+          const linkRegex = /\[Alpha Signal Link (\d+)\] (https:\/\/link\.alphasignal\.ai\/[A-Za-z0-9]+)/g;
+          let linkMatch;
+          
+          while ((linkMatch = linkRegex.exec(alphaSignalLinks)) !== null) {
+            const linkNumber = linkMatch[1];
+            const url = linkMatch[2].trim();
+            
+            console.log(`Creating fallback discovery for Alpha Signal link ${linkNumber}: ${url}`);
+            
+            // Create a basic discovery for each link
+            const discovery = {
+              title: `Alpha Signal Content Item ${linkNumber}`,
+              description: `This is content from the Alpha Signal newsletter that may be relevant to the project's focus on ${context.projectDomain} and interests in ${context.projectInterests.join(', ')}.`,
+              source: url,
+              relevanceScore: 5, // Default middle relevance
+              categories: ['AI', 'Technology'],
+              type: 'Article' // Default type
+            };
+            
+            discoveries.push(discovery);
+          }
+        }
+      }
+    }
+    
+    console.log(`Created ${discoveries.length} fallback discoveries`);
+    return { discoveries };
+  } catch (error) {
+    console.error('Error creating fallback discoveries:', error);
+    return { discoveries: [] };
+  }
+}
 
 module.exports = openaiService;
