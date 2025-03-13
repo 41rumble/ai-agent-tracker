@@ -364,12 +364,51 @@ const openaiService = {
       const responseContent = completion.choices[0].message.content;
       
       try {
+        console.log('Attempting to parse OpenAI response as JSON');
         const parsedResponse = JSON.parse(responseContent);
-        console.log(`Extracted ${parsedResponse.discoveries?.length || 0} discoveries from newsletter`);
+        
+        // Validate the response structure
+        if (!parsedResponse.discoveries) {
+          console.error('OpenAI response missing discoveries array:', parsedResponse);
+          // Try to fix the response if possible
+          if (Array.isArray(parsedResponse)) {
+            console.log('Response is an array, wrapping in discoveries object');
+            return { discoveries: parsedResponse };
+          }
+          return { discoveries: [] };
+        }
+        
+        if (!Array.isArray(parsedResponse.discoveries)) {
+          console.error('OpenAI discoveries is not an array:', parsedResponse.discoveries);
+          return { discoveries: [] };
+        }
+        
+        console.log(`Successfully extracted ${parsedResponse.discoveries.length} discoveries from newsletter`);
+        
+        // Log the first discovery to verify format
+        if (parsedResponse.discoveries.length > 0) {
+          console.log('Sample discovery from OpenAI:', JSON.stringify(parsedResponse.discoveries[0], null, 2));
+        }
+        
         return parsedResponse;
       } catch (parseError) {
         console.error('Error parsing OpenAI JSON response:', parseError);
         console.log('Raw response:', responseContent);
+        
+        // Try to extract JSON from the response if it's embedded in text
+        try {
+          const jsonMatch = responseContent.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            console.log('Attempting to extract JSON from response text');
+            const extractedJson = jsonMatch[0];
+            const parsedJson = JSON.parse(extractedJson);
+            console.log('Successfully extracted JSON from response text');
+            return parsedJson;
+          }
+        } catch (extractError) {
+          console.error('Failed to extract JSON from response text:', extractError);
+        }
+        
         return { discoveries: [] };
       }
     } catch (error) {

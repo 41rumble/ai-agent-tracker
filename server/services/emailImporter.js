@@ -45,14 +45,24 @@ async function processNewsletterContent(projectId, newsletterData) {
     };
     
     // Process the content with OpenAI
+    console.log(`Sending newsletter content to OpenAI for processing (${newsletterData.content.length} characters)`);
     const aiResponse = await openaiService.processNewsletterContent(
       newsletterData.content,
       context
     );
     
+    console.log('Received response from OpenAI:', JSON.stringify(aiResponse, null, 2));
+    
     if (!aiResponse || !aiResponse.discoveries || !Array.isArray(aiResponse.discoveries)) {
       console.error('Invalid AI response format:', aiResponse);
       return { discoveryCount: 0 };
+    }
+    
+    console.log(`Found ${aiResponse.discoveries.length} discoveries in AI response`);
+    
+    // Log the first discovery to verify format
+    if (aiResponse.discoveries.length > 0) {
+      console.log('Sample discovery:', JSON.stringify(aiResponse.discoveries[0], null, 2));
     }
     
     // Create discovery entries from the AI response
@@ -75,8 +85,25 @@ async function processNewsletterContent(projectId, newsletterData) {
     
     // Only save if we have discoveries
     if (discoveries.length > 0) {
-      await Discovery.insertMany(discoveries);
-      console.log(`Created ${discoveries.length} discoveries from newsletter`);
+      console.log(`Attempting to save ${discoveries.length} discoveries to database`);
+      try {
+        // Log the first discovery to be saved
+        console.log('First discovery to be saved:', JSON.stringify(discoveries[0], null, 2));
+        
+        // Save to database
+        const savedDiscoveries = await Discovery.insertMany(discoveries);
+        console.log(`Successfully created ${savedDiscoveries.length} discoveries from newsletter`);
+        
+        // Log the IDs of saved discoveries
+        console.log('Saved discovery IDs:', savedDiscoveries.map(d => d._id));
+      } catch (dbError) {
+        console.error('Error saving discoveries to database:', dbError);
+        // Try to identify the specific issue
+        if (dbError.name === 'ValidationError') {
+          console.error('Validation error details:', dbError.errors);
+        }
+        throw dbError; // Re-throw to be caught by the outer try/catch
+      }
     } else {
       console.log('No relevant discoveries found in newsletter content');
     }
