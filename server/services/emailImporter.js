@@ -492,7 +492,11 @@ function extractAlphaSignalSections(content) {
     
     // Extract news items directly from HTML structure
     // Look for href links with titles - these are the main content items
+    // This pattern handles both standard format and the special Alpha Signal format with =3D encoding
     const titleLinkRegex = /<a href=3D["']?(https?:\/\/[^"'\s>]+)["']?[^>]*>([^<]+)<\/a>/g;
+    
+    // Also try a more specific pattern for Alpha Signal URLs
+    const alphaSignalLinkRegex = /<a href=3D["']?(https?:\/\/link\.alphasignal\.ai\/[^"'\s>]+)["']?[^>]*>([^<]+)<\/a>/g;
     let match;
     
     while ((match = titleLinkRegex.exec(content)) !== null) {
@@ -508,15 +512,21 @@ function extractAlphaSignalSections(content) {
         }
       });
       
-      // Clean the URL - remove tracking parameters
-      try {
-        const urlObj = new URL(url);
-        ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content'].forEach(param => {
-          urlObj.searchParams.delete(param);
-        });
-        url = urlObj.toString();
-      } catch (e) {
-        console.log(`Failed to parse URL: ${url}`);
+      // Special handling for Alpha Signal URLs - preserve their tracking/shortened URLs
+      if (url.includes('link.alphasignal.ai')) {
+        console.log(`Preserving Alpha Signal tracking URL: ${url}`);
+        // Don't modify these URLs as they're special shortened links
+      } else {
+        // For other URLs, clean tracking parameters
+        try {
+          const urlObj = new URL(url);
+          ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content'].forEach(param => {
+            urlObj.searchParams.delete(param);
+          });
+          url = urlObj.toString();
+        } catch (e) {
+          console.log(`Failed to parse URL: ${url}`);
+        }
       }
       
       const title = match[2].trim();
@@ -541,9 +551,51 @@ function extractAlphaSignalSections(content) {
       }
     }
     
+    // Try the Alpha Signal specific regex to catch any links we might have missed
+    let alphaMatch;
+    while ((alphaMatch = alphaSignalLinkRegex.exec(content)) !== null) {
+      // Fix URL encoding
+      let url = alphaMatch[1].replace(/=3D/g, '=');
+      
+      // Handle other common URL encoding in emails
+      url = url.replace(/=([0-9A-F]{2})/g, (_, p1) => {
+        try {
+          return String.fromCharCode(parseInt(p1, 16));
+        } catch (e) {
+          return _;
+        }
+      });
+      
+      const title = alphaMatch[2].trim();
+      
+      // Look for category tags
+      const beforeContext = content.substring(Math.max(0, alphaMatch.index - 300), alphaMatch.index);
+      const categoryMatch = beforeContext.match(/<span style=3D[^>]*>([^<]+)<\/span>/);
+      const category = categoryMatch ? categoryMatch[1].replace(/=3D/g, '=').trim() : '';
+      
+      // Look for like counts
+      const afterContext = content.substring(alphaMatch.index, Math.min(content.length, alphaMatch.index + 500));
+      const likesMatch = afterContext.match(/=E2=87=A7\s*([\d,]+)\s*Likes/);
+      const likes = likesMatch ? likesMatch[1].trim() : '';
+      
+      // Check if we already have this URL to avoid duplicates
+      const isDuplicate = items.some(item => item.url === url || item.title === title);
+      
+      if (title && url && !isDuplicate) {
+        console.log(`Found Alpha Signal specific URL: ${url} with title: ${title}`);
+        items.push({
+          title,
+          url,
+          category,
+          likes
+        });
+      }
+    }
+    
     // Add the extracted items to the sections object
     if (items.length > 0) {
       sections.extractedItems = items;
+      console.log(`Total extracted items: ${items.length}`);
     }
     
     // Also try the old method as a fallback
