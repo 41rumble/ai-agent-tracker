@@ -6,6 +6,107 @@ const openai = new OpenAI({
 });
 
 const openaiService = {
+  /**
+   * Evaluate the relevance of pre-extracted discoveries
+   * @param {Array} discoveries - Array of discovery objects
+   * @param {Object} context - Context information about the project
+   * @returns {Promise<Object>} - Evaluated discoveries with relevance scores
+   */
+  evaluateDiscoveriesRelevance: async (discoveries, context) => {
+    try {
+      console.log(`Evaluating relevance of ${discoveries.length} pre-extracted discoveries`);
+      
+      // Create a system prompt focused on relevance evaluation
+      const systemPrompt = `You are an AI assistant that evaluates the relevance of content items to a specific project.
+      The project is about ${context.projectDomain} with a focus on ${context.projectGoals.join(', ')} and interests in ${context.projectInterests.join(', ')}.
+      
+      Your task is to evaluate each item for its relevance to the project and provide a relevance score and improved description.`;
+      
+      // Create a user prompt with the discoveries to evaluate
+      const userPrompt = `I have a set of content items from an AI newsletter that I need you to evaluate for relevance to my project.
+      
+      Project details:
+      - Name: ${context.projectName}
+      - Description: ${context.projectDescription}
+      - Domain: ${context.projectDomain}
+      - Goals: ${context.projectGoals.join(', ')}
+      - Interests: ${context.projectInterests.join(', ')}
+      
+      For each item, please:
+      1. Evaluate its relevance to the project on a scale of 1-10
+      2. Provide a more detailed description that explains why it's relevant
+      3. Assign appropriate categories
+      4. Determine the correct content type
+      
+      Here are the items to evaluate:
+      ${JSON.stringify(discoveries, null, 2)}
+      
+      Return the evaluated items in the same format, but with updated relevance scores, descriptions, categories, and types.
+      
+      Format your response as a JSON object with an array of discoveries.
+      
+      Example format:
+      {
+        "discoveries": [
+          {
+            "title": "Item Title",
+            "description": "Improved description explaining relevance",
+            "source": "https://example.com",
+            "relevanceScore": 8,
+            "categories": ["AI", "Relevant Category", "Another Category"],
+            "type": "Tool"
+          }
+        ]
+      }`;
+      
+      // Make the API call
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4-turbo",
+        messages: [
+          {
+            role: "system",
+            content: systemPrompt
+          },
+          {
+            role: "user",
+            content: userPrompt
+          }
+        ],
+        response_format: { type: "json_object" },
+        temperature: 0.5
+      });
+      
+      const responseContent = completion.choices[0].message.content;
+      
+      try {
+        console.log('Parsing relevance evaluation response');
+        const parsedResponse = JSON.parse(responseContent);
+        
+        if (!parsedResponse.discoveries || !Array.isArray(parsedResponse.discoveries)) {
+          console.error('Invalid evaluation response format:', parsedResponse);
+          return { discoveries: discoveries }; // Return original discoveries if evaluation fails
+        }
+        
+        console.log(`Successfully evaluated ${parsedResponse.discoveries.length} discoveries`);
+        
+        // Ensure we preserve the original URLs
+        parsedResponse.discoveries.forEach((evaluatedDiscovery, index) => {
+          if (index < discoveries.length) {
+            // Always preserve the original source URL
+            evaluatedDiscovery.source = discoveries[index].source;
+          }
+        });
+        
+        return parsedResponse;
+      } catch (parseError) {
+        console.error('Error parsing evaluation response:', parseError);
+        return { discoveries: discoveries }; // Return original discoveries if parsing fails
+      }
+    } catch (error) {
+      console.error('Discovery relevance evaluation error:', error);
+      return { discoveries: discoveries }; // Return original discoveries if evaluation fails
+    }
+  },
   createProjectAgent: async (projectData) => {
     try {
       const agent = await openai.beta.assistants.create({

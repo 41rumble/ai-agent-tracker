@@ -44,18 +44,57 @@ async function processNewsletterContent(projectId, newsletterData) {
       newsletterDate: newsletterData.date
     };
     
-    // Process the content with OpenAI
-    console.log(`Sending newsletter content to OpenAI for processing (${newsletterData.content.length} characters)`);
-    const aiResponse = await openaiService.processNewsletterContent(
-      newsletterData.content,
-      context
-    );
+    // Check if we have direct discoveries from Alpha Signal items
+    let directDiscoveries = [];
+    
+    // Try to extract direct discoveries from the content
+    try {
+      // Look for the extracted sections in the content
+      const extractedSectionsMatch = newsletterData.content.match(/### EXTRACTED SECTIONS ###\s*(\{[\s\S]*\})/);
+      if (extractedSectionsMatch && extractedSectionsMatch[1]) {
+        const extractedSections = JSON.parse(extractedSectionsMatch[1]);
+        if (extractedSections.directDiscoveries && Array.isArray(extractedSections.directDiscoveries)) {
+          directDiscoveries = extractedSections.directDiscoveries;
+          console.log(`Found ${directDiscoveries.length} direct discoveries in extracted sections`);
+        }
+      }
+    } catch (error) {
+      console.error('Error extracting direct discoveries:', error);
+    }
+    
+    let aiResponse;
+    
+    // If we have direct discoveries, use them directly
+    if (directDiscoveries.length > 0) {
+      console.log('Using direct discoveries from Alpha Signal items');
+      
+      // Process with OpenAI only for relevance scoring
+      console.log('Sending direct discoveries to OpenAI for relevance scoring');
+      aiResponse = await openaiService.evaluateDiscoveriesRelevance(
+        directDiscoveries,
+        context
+      );
+    } else {
+      // Process the content with OpenAI as usual
+      console.log(`Sending newsletter content to OpenAI for processing (${newsletterData.content.length} characters)`);
+      aiResponse = await openaiService.processNewsletterContent(
+        newsletterData.content,
+        context
+      );
+    }
     
     console.log('Received response from OpenAI:', JSON.stringify(aiResponse, null, 2));
     
     if (!aiResponse || !aiResponse.discoveries || !Array.isArray(aiResponse.discoveries)) {
       console.error('Invalid AI response format:', aiResponse);
-      return { discoveryCount: 0 };
+      
+      // If we have direct discoveries but AI processing failed, use them directly
+      if (directDiscoveries.length > 0) {
+        console.log('Using direct discoveries as fallback since AI processing failed');
+        aiResponse = { discoveries: directDiscoveries };
+      } else {
+        return { discoveryCount: 0 };
+      }
     }
     
     console.log(`Found ${aiResponse.discoveries.length} discoveries in AI response`);
@@ -373,10 +412,11 @@ async function checkEmailsForUser(userId) {
                               content += "\n";
                             });
                             
-                            // Also add these URLs to the extracted links if they're not already there
-                            // and ensure they're properly formatted
-                            sections.extractedItems.forEach(item => {
-                              if (item.url) {
+                            // Process each item directly to create discoveries
+                            const directDiscoveries = [];
+                            
+                            sections.extractedItems.forEach((item, index) => {
+                              if (item.url && item.title) {
                                 // Clean and format Alpha Signal URLs
                                 if (item.url.includes('link.alphasignal.ai')) {
                                   const codeMatch = item.url.match(/link\.alphasignal\.ai\/([A-Za-z0-9]+)/);
@@ -386,20 +426,46 @@ async function checkEmailsForUser(userId) {
                                     
                                     // Update the item URL to the clean version
                                     item.url = cleanUrl;
-                                    
-                                    // Add to extracted links if not already there
-                                    if (!extractedLinks.includes(cleanUrl)) {
-                                      extractedLinks.push(cleanUrl);
-                                      console.log(`Added cleaned Alpha Signal URL to extracted links: ${cleanUrl}`);
-                                    }
-                                  } else if (!extractedLinks.includes(item.url)) {
-                                    extractedLinks.push(item.url);
                                   }
-                                } else if (!extractedLinks.includes(item.url)) {
-                                  extractedLinks.push(item.url);
                                 }
+                                
+                                // Add to extracted links if not already there
+                                if (!extractedLinks.includes(item.url)) {
+                                  extractedLinks.push(item.url);
+                                  console.log(`Added item URL to extracted links: ${item.url}`);
+                                }
+                                
+                                // Create a direct discovery for this item
+                                console.log(`Creating direct discovery for item ${index + 1}: ${item.title}`);
+                                
+                                // Create a basic description
+                                let description = `This is an AI tool or technology mentioned in the Alpha Signal newsletter.`;
+                                if (item.category) {
+                                  description += ` It falls under the category of ${item.category}.`;
+                                }
+                                if (item.likes) {
+                                  description += ` It has received ${item.likes} likes.`;
+                                }
+                                
+                                // Create discovery object
+                                const discovery = {
+                                  title: item.title,
+                                  description: description,
+                                  source: item.url,
+                                  relevanceScore: 5, // Default middle relevance - will be evaluated by OpenAI
+                                  categories: item.category ? [item.category, 'AI', 'Technology'] : ['AI', 'Technology'],
+                                  type: 'Tool' // Default type
+                                };
+                                
+                                directDiscoveries.push(discovery);
                               }
                             });
+                            
+                            // Store the direct discoveries for later use
+                            if (directDiscoveries.length > 0) {
+                              console.log(`Created ${directDiscoveries.length} direct discoveries from Alpha Signal items`);
+                              sections.directDiscoveries = directDiscoveries;
+                            }
                           }
                           
                           // Add other section information to the content
