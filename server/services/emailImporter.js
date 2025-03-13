@@ -68,12 +68,86 @@ async function processNewsletterContent(projectId, newsletterData) {
     if (directDiscoveries.length > 0) {
       console.log('Using direct discoveries from Alpha Signal items');
       
-      // Process with OpenAI only for relevance scoring
-      console.log('Sending direct discoveries to OpenAI for relevance scoring');
-      aiResponse = await openaiService.evaluateDiscoveriesRelevance(
-        directDiscoveries,
-        context
-      );
+      try {
+        // Process with OpenAI only for relevance scoring
+        console.log('Sending direct discoveries to OpenAI for relevance scoring');
+        aiResponse = await openaiService.evaluateDiscoveriesRelevance(
+          directDiscoveries,
+          context
+        );
+        
+        // Check if OpenAI returned empty discoveries
+        if (!aiResponse.discoveries || aiResponse.discoveries.length === 0) {
+          console.log('OpenAI returned empty discoveries array, using direct discoveries with default relevance scores');
+          
+          // Assign default relevance scores and categories based on project domain
+          const enhancedDiscoveries = directDiscoveries.map(discovery => {
+            // Create a more detailed description
+            let enhancedDescription = discovery.description;
+            
+            // Add potential relevance to VFX/Animation if that's the project domain
+            if (context.projectDomain && context.projectDomain.toLowerCase().includes('vfx') || 
+                context.projectDomain && context.projectDomain.toLowerCase().includes('animation')) {
+              enhancedDescription += ` This could potentially be relevant to ${context.projectDomain} workflows by providing new tools or techniques that could be integrated into the creative pipeline.`;
+            }
+            
+            // Assign default categories based on title keywords
+            const title = discovery.title.toLowerCase();
+            let categories = discovery.categories || [];
+            let relevanceScore = 5; // Default middle score
+            
+            // Check for keywords in the title to determine relevance and categories
+            if (title.includes('ai') || title.includes('ml') || title.includes('model')) {
+              categories.push('AI Tools');
+              relevanceScore = 6;
+            }
+            
+            if (title.includes('image') || title.includes('video') || title.includes('render')) {
+              categories.push('Visual Processing');
+              relevanceScore = 7;
+            }
+            
+            if (title.includes('3d') || title.includes('animation') || title.includes('motion')) {
+              categories.push('Animation');
+              relevanceScore = 8;
+            }
+            
+            if (title.includes('api') || title.includes('sdk') || title.includes('developer')) {
+              categories.push('Development Tools');
+              relevanceScore = 6;
+            }
+            
+            // Ensure we have at least some categories
+            if (categories.length === 0) {
+              categories = ['AI', 'Technology'];
+            }
+            
+            // Remove duplicates
+            categories = [...new Set(categories)];
+            
+            return {
+              ...discovery,
+              description: enhancedDescription,
+              categories: categories,
+              relevanceScore: relevanceScore
+            };
+          });
+          
+          aiResponse = { discoveries: enhancedDiscoveries };
+        }
+      } catch (error) {
+        console.error('Error evaluating discoveries with OpenAI:', error);
+        console.log('Using direct discoveries with default relevance scores');
+        
+        // Use direct discoveries with default relevance scores
+        aiResponse = { 
+          discoveries: directDiscoveries.map(d => ({
+            ...d,
+            relevanceScore: 5,
+            categories: d.categories || ['AI', 'Technology']
+          }))
+        };
+      }
     } else {
       // Process the content with OpenAI as usual
       console.log(`Sending newsletter content to OpenAI for processing (${newsletterData.content.length} characters)`);
@@ -100,7 +174,61 @@ async function processNewsletterContent(projectId, newsletterData) {
     // If AI returned empty discoveries but we have direct discoveries, use them
     if (aiResponse.discoveries.length === 0 && directDiscoveries.length > 0) {
       console.log('AI returned empty discoveries array, using direct discoveries as fallback');
-      aiResponse = { discoveries: directDiscoveries };
+      
+      // Assign default relevance scores and categories based on project domain
+      const enhancedDiscoveries = directDiscoveries.map(discovery => {
+        // Create a more detailed description
+        let enhancedDescription = discovery.description;
+        
+        // Add potential relevance to VFX/Animation if that's the project domain
+        if (context.projectDomain && context.projectDomain.toLowerCase().includes('vfx') || 
+            context.projectDomain && context.projectDomain.toLowerCase().includes('animation')) {
+          enhancedDescription += ` This could potentially be relevant to ${context.projectDomain} workflows by providing new tools or techniques that could be integrated into the creative pipeline.`;
+        }
+        
+        // Assign default categories based on title keywords
+        const title = discovery.title.toLowerCase();
+        let categories = discovery.categories || [];
+        let relevanceScore = 5; // Default middle score
+        
+        // Check for keywords in the title to determine relevance and categories
+        if (title.includes('ai') || title.includes('ml') || title.includes('model')) {
+          categories.push('AI Tools');
+          relevanceScore = 6;
+        }
+        
+        if (title.includes('image') || title.includes('video') || title.includes('render')) {
+          categories.push('Visual Processing');
+          relevanceScore = 7;
+        }
+        
+        if (title.includes('3d') || title.includes('animation') || title.includes('motion')) {
+          categories.push('Animation');
+          relevanceScore = 8;
+        }
+        
+        if (title.includes('api') || title.includes('sdk') || title.includes('developer')) {
+          categories.push('Development Tools');
+          relevanceScore = 6;
+        }
+        
+        // Ensure we have at least some categories
+        if (categories.length === 0) {
+          categories = ['AI', 'Technology'];
+        }
+        
+        // Remove duplicates
+        categories = [...new Set(categories)];
+        
+        return {
+          ...discovery,
+          description: enhancedDescription,
+          categories: categories,
+          relevanceScore: relevanceScore
+        };
+      });
+      
+      aiResponse = { discoveries: enhancedDiscoveries };
     }
     
     console.log(`Found ${aiResponse.discoveries.length} discoveries in AI response`);
@@ -430,8 +558,21 @@ async function checkEmailsForUser(userId) {
                             // Create a map to track which URLs have been used
                             const usedUrls = new Map();
                             
+                            // Define promotional titles to filter out
+                            const promotionalTitles = [
+                              'signup', 'sign up', 'subscribe', 
+                              'follow', 'work with us', 'join', 
+                              'contact', 'about us', 'feedback'
+                            ];
+                            
                             sections.extractedItems.forEach((item, index) => {
                               if (item.url && item.title) {
+                                // Skip promotional items
+                                const lowerTitle = item.title.toLowerCase();
+                                if (promotionalTitles.some(promo => lowerTitle.includes(promo))) {
+                                  console.log(`Skipping promotional item: "${item.title}"`);
+                                  return; // Skip this item
+                                }
                                 // Clean and format Alpha Signal URLs
                                 if (item.url.includes('link.alphasignal.ai')) {
                                   const codeMatch = item.url.match(/link\.alphasignal\.ai\/([A-Za-z0-9]+)/);
