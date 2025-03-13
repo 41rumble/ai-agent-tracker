@@ -421,6 +421,15 @@ async function checkEmailsForUser(userId) {
                             // Process each item directly to create discoveries
                             const directDiscoveries = [];
                             
+                            // First, log all items for debugging
+                            console.log('Alpha Signal items extracted:');
+                            sections.extractedItems.forEach((item, index) => {
+                              console.log(`Item ${index + 1}: Title: "${item.title}", URL: ${item.url}, Category: ${item.category || 'N/A'}`);
+                            });
+                            
+                            // Create a map to track which URLs have been used
+                            const usedUrls = new Map();
+                            
                             sections.extractedItems.forEach((item, index) => {
                               if (item.url && item.title) {
                                 // Clean and format Alpha Signal URLs
@@ -441,6 +450,13 @@ async function checkEmailsForUser(userId) {
                                   console.log(`Added item URL to extracted links: ${item.url}`);
                                 }
                                 
+                                // Check if this URL has been used before
+                                if (usedUrls.has(item.url)) {
+                                  console.log(`Warning: URL ${item.url} is used by multiple items. First for "${usedUrls.get(item.url)}", now for "${item.title}"`);
+                                } else {
+                                  usedUrls.set(item.url, item.title);
+                                }
+                                
                                 // Create a direct discovery for this item
                                 console.log(`Creating direct discovery for item ${index + 1}: ${item.title}`);
                                 
@@ -453,7 +469,7 @@ async function checkEmailsForUser(userId) {
                                   description += ` It has received ${item.likes} likes.`;
                                 }
                                 
-                                // Create discovery object
+                                // Create discovery object with exact title and URL from the newsletter
                                 const discovery = {
                                   title: item.title,
                                   description: description,
@@ -672,6 +688,15 @@ function extractAlphaSignalSections(content) {
       // Format with URL encoding in path
       /<a href=3D["']?(https?:\/\/link\.alphasignal\.ai\/[A-Za-z0-9%]+)["']?[^>]*>([^<]+)<\/a>/g
     ];
+    
+    // Log the content for debugging
+    console.log('Searching for Alpha Signal links in content...');
+    
+    // Look for specific patterns that indicate Alpha Signal newsletter format
+    const alphaSignalFormatMatch = content.match(/TOP NEWS|TRENDING SIGNALS|TOP TUTORIALS|HOW TO/g);
+    if (alphaSignalFormatMatch) {
+      console.log(`Detected Alpha Signal newsletter format with sections: ${alphaSignalFormatMatch.join(', ')}`);
+    }
     let match;
     
     while ((match = titleLinkRegex.exec(content)) !== null) {
@@ -768,38 +793,86 @@ function extractAlphaSignalSections(content) {
           }
         }
         
-        const title = alphaMatch[2].trim();
+        // Get the title and clean it
+        const title = alphaMatch[2].trim()
+          .replace(/&amp;/g, '&')
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+          .replace(/&quot;/g, '"')
+          .replace(/&#39;/g, "'")
+          .replace(/=E2=80=99/g, "'")
+          .replace(/=E2=80=9C/g, '"')
+          .replace(/=E2=80=9D/g, '"');
         
-        // Look for category tags
-        const beforeContext = content.substring(Math.max(0, alphaMatch.index - 300), alphaMatch.index);
-        const categoryMatch = beforeContext.match(/<span style=3D[^>]*>([^<]+)<\/span>/) || 
-                             beforeContext.match(/<span style=[^>]*>([^<]+)<\/span>/);
-        const category = categoryMatch ? categoryMatch[1].replace(/=3D/g, '=').trim() : '';
+        // Log the match for debugging
+        console.log(`Found Alpha Signal link match: URL=${url}, Title="${title}"`);
+        
+        // Look for category tags - search in a wider context to find the category
+        const beforeContext = content.substring(Math.max(0, alphaMatch.index - 500), alphaMatch.index);
+        
+        // Try multiple patterns for category extraction
+        const categoryPatterns = [
+          /<span style=3D[^>]*>([^<]+)<\/span>/,
+          /<span style=[^>]*>([^<]+)<\/span>/,
+          /<div[^>]*class=3D["']?category["']?[^>]*>([^<]+)<\/div>/,
+          /<div[^>]*class=["']?category["']?[^>]*>([^<]+)<\/div>/
+        ];
+        
+        let category = '';
+        for (const pattern of categoryPatterns) {
+          const categoryMatch = beforeContext.match(pattern);
+          if (categoryMatch && categoryMatch[1]) {
+            category = categoryMatch[1].replace(/=3D/g, '=').trim();
+            break;
+          }
+        }
         
         // Look for like counts with multiple patterns
         const afterContext = content.substring(alphaMatch.index, Math.min(content.length, alphaMatch.index + 500));
-        const likesMatch = afterContext.match(/=E2=87=A7\s*([\d,]+)\s*Likes/) || 
-                          afterContext.match(/⇧\s*([\d,]+)\s*Likes/);
-        const likes = likesMatch ? likesMatch[1].trim() : '';
+        const likesPatterns = [
+          /=E2=87=A7\s*([\d,]+)\s*Likes/,
+          /⇧\s*([\d,]+)\s*Likes/,
+          /(\d+)\s*Likes/
+        ];
+        
+        let likes = '';
+        for (const pattern of likesPatterns) {
+          const likesMatch = afterContext.match(pattern);
+          if (likesMatch && likesMatch[1]) {
+            likes = likesMatch[1].trim();
+            break;
+          }
+        }
         
         // Check if we already have this URL to avoid duplicates
         const isDuplicate = items.some(item => {
           // Check for exact URL match
-          if (item.url === url) return true;
+          if (item.url === url) {
+            console.log(`Skipping duplicate URL: ${url}`);
+            return true;
+          }
           
           // Check for URL with the same Alpha Signal code
           if (item.url.includes('link.alphasignal.ai/') && url.includes('link.alphasignal.ai/')) {
             const itemCode = item.url.match(/link\.alphasignal\.ai\/([A-Za-z0-9]+)/);
             const urlCode = url.match(/link\.alphasignal\.ai\/([A-Za-z0-9]+)/);
-            if (itemCode && urlCode && itemCode[1] === urlCode[1]) return true;
+            if (itemCode && urlCode && itemCode[1] === urlCode[1]) {
+              console.log(`Skipping duplicate Alpha Signal code: ${itemCode[1]}`);
+              return true;
+            }
           }
           
-          // Check for title match
-          return item.title === title;
+          // Check for exact title match
+          if (item.title === title) {
+            console.log(`Skipping duplicate title: "${title}"`);
+            return true;
+          }
+          
+          return false;
         });
         
         if (title && url && !isDuplicate) {
-          console.log(`Found Alpha Signal specific URL: ${url} with title: ${title}`);
+          console.log(`Adding Alpha Signal item: URL=${url}, Title="${title}", Category=${category || 'N/A'}`);
           items.push({
             title,
             url,
