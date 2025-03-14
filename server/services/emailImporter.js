@@ -98,13 +98,15 @@ async function processNewsletterContent(projectId, newsletterData) {
         let relevanceScore = 5; // Default middle score
         let type = 'Tool'; // Default type
         
-        // Determine type based on title
+        // Determine type based on title - only use valid enum values: ['Article', 'Discussion', 'News', 'Research', 'Tool', 'Other']
         if (lowerTitle.includes('announces') || lowerTitle.includes('launches') || lowerTitle.includes('introduces') || lowerTitle.includes('reveals')) {
           type = 'News';
         } else if (lowerTitle.includes('research') || lowerTitle.includes('paper')) {
           type = 'Research';
-        } else if (lowerTitle.includes('tutorial') || lowerTitle.includes('guide') || lowerTitle.includes('how to')) {
+        } else if (lowerTitle.includes('tutorial') || lowerTitle.includes('guide') || lowerTitle.includes('how to') || lowerTitle.includes('case study')) {
           type = 'Article';
+        } else if (lowerTitle.includes('discussion') || lowerTitle.includes('debate') || lowerTitle.includes('forum')) {
+          type = 'Discussion';
         }
         
         // Check for keywords in the title to determine relevance and categories
@@ -162,6 +164,13 @@ async function processNewsletterContent(projectId, newsletterData) {
         // Remove duplicates
         categories = [...new Set(categories)];
         
+        // Validate type to ensure it's one of the allowed enum values
+        const validTypes = ['Article', 'Discussion', 'News', 'Research', 'Tool', 'Other'];
+        if (!validTypes.includes(type)) {
+          console.log(`Invalid type "${type}" for discovery "${title}", defaulting to "Other"`);
+          type = 'Other';
+        }
+        
         return {
           ...discovery,
           description: enhancedDescription,
@@ -215,23 +224,38 @@ async function processNewsletterContent(projectId, newsletterData) {
       console.log('Sample discovery:', JSON.stringify(aiResponse.discoveries[0], null, 2));
     }
     
-    // Create discovery entries from the AI response
-    const discoveries = aiResponse.discoveries.map(discovery => ({
-      projectId,
-      title: discovery.title,
-      description: discovery.description,
-      source: discovery.source || `Newsletter: ${newsletterData.name}`,
-      relevanceScore: discovery.relevanceScore || 5,
-      categories: discovery.categories || [],
-      type: discovery.type || 'Article',
-      discoveredAt: new Date(),
-      publicationDate: newsletterData.date ? new Date(newsletterData.date) : new Date(),
-      searchContext: {
-        source: 'newsletter',
-        newsletterName: newsletterData.name,
-        newsletterSubject: newsletterData.subject
+    // Create discovery entries from the AI response with validation
+    const validTypes = ['Article', 'Discussion', 'News', 'Research', 'Tool', 'Other'];
+    
+    const discoveries = aiResponse.discoveries.map(discovery => {
+      // Validate type
+      let type = discovery.type || 'Article';
+      if (!validTypes.includes(type)) {
+        console.log(`Invalid type "${type}" for discovery "${discovery.title}", defaulting to "Other"`);
+        type = 'Other';
       }
-    }));
+      
+      // Ensure relevance score is within valid range
+      let relevanceScore = discovery.relevanceScore || 5;
+      relevanceScore = Math.max(1, Math.min(10, relevanceScore));
+      
+      return {
+        projectId,
+        title: discovery.title,
+        description: discovery.description,
+        source: discovery.source || `Newsletter: ${newsletterData.name}`,
+        relevanceScore: relevanceScore,
+        categories: discovery.categories || [],
+        type: type,
+        discoveredAt: new Date(),
+        publicationDate: newsletterData.date ? new Date(newsletterData.date) : new Date(),
+        searchContext: {
+          source: 'newsletter',
+          newsletterName: newsletterData.name,
+          newsletterSubject: newsletterData.subject
+        }
+      };
+    });
     
     // Only save if we have discoveries
     if (discoveries.length > 0) {
