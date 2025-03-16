@@ -1,4 +1,5 @@
 const Project = require('../models/Project');
+const Discovery = require('../models/Discovery');
 const searchService = require('../services/searchService');
 const notificationService = require('../services/notificationService');
 
